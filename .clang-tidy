@@ -1,0 +1,7 @@
+Checks: 'readability-*,bugprone-*,misc-*,clang-analyzer-*,performance-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+
+FormatStyle:     none
+User:            user
+CheckOptions: {}
