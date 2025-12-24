@@ -206,6 +206,9 @@ int main(int argc, char** argv) {
         Video_BeginFrame();
         
         if (Editor_IsActive()) {
+            // Update Editor Logic (Selection)
+            Editor_Update(&map, &cam);
+            
             // EDITOR MODE
             int view = Editor_GetViewMode();
             if (view == 0) {
@@ -216,11 +219,11 @@ int main(int argc, char** argv) {
                 // 2D View
                 int w, h;
                 SDL_GetWindowSize(Video_GetWindow(), &w, &h);
-                Render_Map2D(Video_GetRenderer(), &map, cam, 0, 0, w, h, 32.0f); // 32 pixels per unit zoom
+                Render_Map2D(Video_GetRenderer(), &map, cam, 0, 0, w, h, 32.0f, Editor_GetSelectedSectorID()); 
             }
             
             // Draw UI
-            Editor_Render();
+            Editor_Render(&map, &cam);
             
         } else {
             // GAME MODE

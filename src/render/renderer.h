@@ -4,7 +4,7 @@
 #include "../core/types.h"
 #include "../world/world_types.h"
 
-typedef struct {
+typedef struct Camera {
     Vec3 pos;    // x, y, z
     f32  yaw;    // horizontal angle in radians
     // f32 pitch; // vertical angle (later)
@@ -22,6 +22,9 @@ void Render_Frame(Camera cam, Map* map);
 
 // Render Top-Down Map (High Resolution via SDL)
 struct SDL_Renderer;
-void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom);
+void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom, int highlight_sector);
+
+// Helper
+SectorID GetSectorAt(Map* map, Vec2 pos);
 
 #endif // BOOMER_RENDERER_H

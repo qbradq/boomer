@@ -30,7 +30,7 @@ typedef struct {
     // Future: Floor/Ceiling textures, light level
 } Sector;
 
-typedef struct {
+typedef struct Map {
     Wall*   walls;
     u32     wall_count;
     

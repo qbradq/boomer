@@ -386,7 +386,7 @@ void Render_Frame(Camera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom) {
+void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom, int highlight_sector) {
     // Set viewport/clip
     SDL_Rect view = {x, y, w, h};
     SDL_RenderSetViewport(ren, &view);
@@ -404,7 +404,7 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
     int grid_size = (int)(zoom);
     if (grid_size > 4) {
         int off_x = (int)(cx - cam.pos.x * zoom) % grid_size;
-        int off_y = (int)(cy + cam.pos.y * zoom) % grid_size; // +Y because World Y is Up, Screen Y is Down
+        int off_y = (int)(cy + cam.pos.y * zoom) % grid_size;
         
         for (int gx = off_x; gx < w; gx += grid_size) SDL_RenderDrawLine(ren, gx, 0, gx, h);
         for (int gy = off_y; gy < h; gy += grid_size) SDL_RenderDrawLine(ren, 0, gy, w, gy);
@@ -414,35 +414,43 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
     for (int i = 0; i < map->wall_count; ++i) {
         Wall* wall = &map->walls[i];
         
-        // World Coordinates
-        // In this engine (from WorldToScreen logic):
-        // X is Right, Y is (?)
-        // TransformToCamera negates Y: `-(local.x * sn + local.y * cs)`
-        // So standard 2D map: X horizontal, Y vertical.
-        
-        // Screen Y is Down. World Y is often Up.
-        // Let's assume World Y is Up (North).
-        
         float x1 = cx + (wall->p1.x - cam.pos.x) * zoom;
-        float y1 = cy - (wall->p1.y - cam.pos.y) * zoom; // Invert Y
+        float y1 = cy - (wall->p1.y - cam.pos.y) * zoom;
         float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
         float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
         
-        // Portal?
         if (wall->next_sector != -1) {
-            SDL_SetRenderDrawColor(ren, 200, 50, 50, 255); // Red for portals
+            SDL_SetRenderDrawColor(ren, 200, 50, 50, 255); 
         } else {
-            SDL_SetRenderDrawColor(ren, 200, 200, 200, 255); // White for walls
+            SDL_SetRenderDrawColor(ren, 200, 200, 200, 255);
         }
-        
         SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
+    }
+    
+    // Highlight Selected Sector
+    if (highlight_sector != -1 && highlight_sector < map->sector_count) {
+        Sector* s = &map->sectors[highlight_sector];
+        SDL_SetRenderDrawColor(ren, 255, 255, 0, 255); // Yellow
         
-        // Normal tick (start of wall)
-        // float nx = -(y2 - y1);
-        // float ny = (x2 - x1);
-        // float len = sqrtf(nx*nx + ny*ny);
-        // nx /= len; ny /= len;
-        // SDL_RenderDrawLineF(ren, (x1+x2)/2, (y1+y2)/2, (x1+x2)/2 + nx*5, (y1+y2)/2 + ny*5);
+        for (u32 i = 0; i < s->num_walls; ++i) {
+            Wall* wall = &map->walls[s->first_wall + i];
+            float x1 = cx + (wall->p1.x - cam.pos.x) * zoom;
+            float y1 = cy - (wall->p1.y - cam.pos.y) * zoom;
+            float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
+            float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
+            
+            // Draw Line
+            SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
+            
+            // Draw Tick
+             float nx = -(y2 - y1);
+             float ny = (x2 - x1);
+             float len = sqrtf(nx*nx + ny*ny);
+             if (len > 0) {
+                 nx /= len; ny /= len;
+                 SDL_RenderDrawLineF(ren, (x1+x2)/2, (y1+y2)/2, (x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8);
+             }
+        }
     }
     
     // Draw Camera
@@ -450,35 +458,13 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
     SDL_FRect player = {cx - 3, cy - 3, 6, 6};
     SDL_RenderFillRectF(ren, &player);
     
-    // Frustum / Direction
+    // Frustum
     float dir_len = 20.0f;
     float cs = cosf(cam.yaw); 
     float sn = sinf(cam.yaw);
+    SDL_RenderDrawLineF(ren, cx, cy, cx + cs * dir_len, cy - sn * dir_len);
     
-    // Rotation logic from TransformToCamera:
-    // Rot(-Yaw).
-    // If Yaw=0, looking +X? or +Y?
-    // In TransformToCamera: x' = x*cs - y*sn. 
-    // If Yaw=0, cs=1, sn=0 -> x'=x, z'=z. 
-    // Wait, Z is depth in camera space. X is lateral. 
-    // P_cam.x = x*cs - y*sn.
-    // P_cam.z = z (height).
-    // The "Depth" axis for projection is usually +X or +Y?
-    // In WorldToScreen: `screen_out->x = ... (p.y / p.x)`.
-    // So P.x is Depth!
-    // If Yaw=0, P.x = input.x.
-    // So +X is Forward/Depth.
-    
-    // So on Map (Top Down):
-    // +X is Up (Screen -Y).
-    // +Y is Left (Screen -X) [Because TransformToCamera negates Y for screen X calculation?]
-    
-    // Let's stick to standard map coords: X is horizontal, Y is vertical.
-    // And assume Forward is vector (cos(yaw), sin(yaw)).
-    
-    SDL_SetRenderDrawColor(ren, 0, 255, 0, 255);
-    SDL_RenderDrawLineF(ren, cx, cy, cx + cs * dir_len, cy - sn * dir_len); // Just a guess arrow
-    
-    // Clear viewport
     SDL_RenderSetViewport(ren, NULL);
 }
+
+

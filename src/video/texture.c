@@ -97,3 +97,9 @@ TextureID Texture_GetID(const char* name) {
     }
     return -1;
 }
+
+const char* Texture_GetName(TextureID id) {
+    if (id < 0 || id >= MAX_TEXTURES) return "Invalid";
+    if (!g_textures[id].active) return "Empty";
+    return g_textures[id].name;
+}

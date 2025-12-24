@@ -25,4 +25,7 @@ Texture* Texture_Get(TextureID id);
 // Get Texture ID by name (path) if loaded, else -1
 TextureID Texture_GetID(const char* name);
 
+// Get Texture Name by ID
+const char* Texture_GetName(TextureID id);
+
 #endif // BOOMER_TEXTURE_H
