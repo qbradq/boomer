@@ -7,7 +7,35 @@ games to the web and desktop.
 
 ### Requirements
 
-- Zig 0.15.2 or later
+All requirements will be installed automatically by CMake.
+
+- CMake 3.14 or later
+- SDL2
+- stb
+- Lua 5.4
+- miniz
+- Nuklear
+
+### Build
+
+```bash
+cmake --preset=release
+cmake --build --preset=release
+```
+
+### Run
+
+```bash
+./build/release/boomer path_to_game_pak_or_dir
+```
+
+### Development
+
+```bash
+cmake --preset=dev
+cmake --build --preset=dev
+./build/dev/boomer # Path to game defaults to the demo content
+```
 
 ## Legal
 
