@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
                 // 2D View
                 int w, h;
                 SDL_GetWindowSize(Video_GetWindow(), &w, &h);
-                Render_Map2D(Video_GetRenderer(), &map, cam, 0, 0, w, h, 32.0f, Editor_GetSelectedSectorID()); 
+                Render_Map2D(Video_GetRenderer(), &map, cam, 0, 0, w, h, 32.0f, Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex()); 
             }
             
             // Draw UI

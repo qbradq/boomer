@@ -38,5 +38,8 @@ void Editor_Toggle(void);
 int Editor_GetViewMode(void);
 
 int Editor_GetSelectedSectorID(void);
+int Editor_GetSelectedWallIndex(void);
+int Editor_GetHoveredSectorID(void);
+int Editor_GetHoveredWallIndex(void);
 
 #endif

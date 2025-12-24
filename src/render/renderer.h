@@ -22,7 +22,7 @@ void Render_Frame(Camera cam, Map* map);
 
 // Render Top-Down Map (High Resolution via SDL)
 struct SDL_Renderer;
-void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom, int highlight_sector);
+void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index);
 
 // Helper
 SectorID GetSectorAt(Map* map, Vec2 pos);

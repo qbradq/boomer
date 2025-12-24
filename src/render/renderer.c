@@ -190,8 +190,6 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
         f32 y2a = center_y - (ceil_h / c2.x) * scale;
         f32 y2b = center_y - (floor_h / c2.x) * scale;
         
-        Texture* wall_tex = Texture_Get(wall->texture_id);
-        
         f32 iz1 = 1.0f / c1.x;
         f32 iz2 = 1.0f / c2.x;
         
@@ -230,14 +228,9 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
             }
             
             // Wall / Portal Window
-            // If Solid: Draw from y_ceil to y_floor
-            // If Portal:
-            //    Draw Top Wall: y_ceil to ny_ceil (if ny_ceil > y_ceil)
-            //    Draw Bot Wall: ny_floor to y_floor (if ny_floor < y_floor)
-            //    Window is ny_ceil to ny_floor
-            
             Texture* top_tex = Texture_Get(wall->top_texture_id);
             Texture* bot_tex = Texture_Get(wall->bottom_texture_id);
+            Texture* wall_tex = Texture_Get(wall->texture_id);
 
             int wy_top = cy_top;
             int wy_bot = cy_bot;
@@ -259,7 +252,6 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
                 int ny_floor = (int)ny_floor_f;
                 
                 // --- Upper Wall (Transom) ---
-                // From Current Ceil (Small Y) to Neighbor Ceil (Large Y)
                 int u_start = max(y_ceil, cy_top);
                 int u_end = min(ny_ceil, cy_bot);
                 
@@ -267,21 +259,7 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
                      if (top_tex) {
                         f32 iz = iz1 + (iz2 - iz1) * t_screen;
                         f32 uz = uz1 + (uz2 - uz1) * t_screen;
-                        f32 u = uz / iz; 
-                        int tex_x = (int)u;
-                        
-                        // V Mapping for upper wall
-                        // Let's stretch? Or align to bottom?
-                        // Align V=0 to Current Ceil (y_ceil).
-                        float v_step = 64.0f / (y_floor_f - y_ceil_f); // Use Main Wall scale approximation? Or re-derive per pixel?
-                         // Better: Calculate world height of THIS segment?
-                         // h = (CurrentCeil - NeighborCeil)
-                         // v_scale = h * 64
-                         // But we want it pixel perfect perspective.
-                         // Linear approximation `v_step` derived from `1/z` is better.
-                         // But for now, let's use the same `v_step` derivation as main wall but scaled?
-                         // Let's just use `Texture_DrawColumn` scaling logic from the main wall logic for now.
-                         // Assuming the texture fits the "Gap" or repeats.
+                        int tex_x = (int)(uz / iz);
                         
                         f32 world_h = (sector->ceil_height - next_s->ceil_height);
                         f32 v_scale = world_h * 64.0f;
@@ -295,7 +273,6 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
                 }
                 
                 // --- Lower Wall (Step) ---
-                // From Neighbor Floor (Small Y) to Current Floor (Large Y)
                 int b_start = max(ny_floor, cy_top);
                 int b_end = min(y_floor, cy_bot);
                 
@@ -303,10 +280,8 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
                     if (bot_tex) {
                         f32 iz = iz1 + (iz2 - iz1) * t_screen;
                         f32 uz = uz1 + (uz2 - uz1) * t_screen;
-                        f32 u = uz / iz; 
-                        int tex_x = (int)u;
+                        int tex_x = (int)(uz / iz);
                         
-                        // V Mapping
                         f32 world_h = (next_s->floor_height - sector->floor_height);
                         f32 v_scale = world_h * 64.0f;
                         float pixel_h = y_floor_f - ny_floor_f;
@@ -331,14 +306,10 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
                     if (wall_tex) {
                         f32 iz = iz1 + (iz2 - iz1) * t_screen;
                         f32 uz = uz1 + (uz2 - uz1) * t_screen;
-                        f32 u = uz / iz; 
-                        
-                        int tex_x = (int)u;
+                        int tex_x = (int)(uz / iz);
                         
                         f32 world_height = sector->ceil_height - sector->floor_height;
                         float v_scale = world_height * 64.0f;
-                        float v_start = 0.0f;
-                        // float v_end = v_scale; 
                         float height = y_floor_f - y_ceil_f;
                         float v_step = v_scale / height;
                         
@@ -351,13 +322,12 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
             
             if (wy_top < wy_bot) {
                 if (portal) {
-                    // Save for recursion
                     next_y_top[x] = wy_top;
                     next_y_bot[x] = wy_bot;
                 }
             } else {
                 if (portal) {
-                   next_y_top[x] = VIDEO_HEIGHT; // Invalid
+                   next_y_top[x] = VIDEO_HEIGHT;
                    next_y_bot[x] = -1;
                 }
             }
@@ -386,7 +356,7 @@ void Render_Frame(Camera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom, int highlight_sector) {
+void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index) {
     // Set viewport/clip
     SDL_Rect view = {x, y, w, h};
     SDL_RenderSetViewport(ren, &view);
@@ -427,10 +397,37 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
         SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
     }
     
-    // Highlight Selected Sector
+    // Render Highlighted/Hovered Sector
+    if (hovered_sector != -1 && hovered_sector != highlight_sector && hovered_sector < map->sector_count) {
+         Sector* s = &map->sectors[hovered_sector];
+         SDL_SetRenderDrawColor(ren, 0, 255, 0, 255); // Lime Green
+         
+         for (u32 i = 0; i < s->num_walls; ++i) {
+            Wall* wall = &map->walls[s->first_wall + i];
+            float x1 = cx + (wall->p1.x - cam.pos.x) * zoom;
+            float y1 = cy - (wall->p1.y - cam.pos.y) * zoom;
+            float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
+            float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
+            
+            SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
+            
+            // Normals (Inward: dy, -dx)
+             float nx = (y2 - y1);
+             float ny = -(x2 - x1);
+             float len = sqrtf(nx*nx + ny*ny);
+             if (len > 0) {
+                 nx /= len; ny /= len;
+                 SDL_RenderDrawLineF(ren, (x1+x2)/2, (y1+y2)/2, (x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8);
+             }
+             
+             // Vertices
+             SDL_FRect r = {x1 - 2, y1 - 2, 5, 5}; // 5x5
+             SDL_RenderFillRectF(ren, &r);
+         }
+    }
+    
     if (highlight_sector != -1 && highlight_sector < map->sector_count) {
         Sector* s = &map->sectors[highlight_sector];
-        SDL_SetRenderDrawColor(ren, 255, 255, 0, 255); // Yellow
         
         for (u32 i = 0; i < s->num_walls; ++i) {
             Wall* wall = &map->walls[s->first_wall + i];
@@ -439,17 +436,37 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
             float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
             float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
             
+            // Highlight Logic for Walls
+            if ((int)i == highlight_wall_index) {
+                SDL_SetRenderDrawColor(ren, 0, 255, 255, 255); // Cyan
+            } 
+            else if ((int)i == hovered_wall_index) {
+                SDL_SetRenderDrawColor(ren, 0, 255, 0, 255); // Lime Green
+            }
+            else {
+                SDL_SetRenderDrawColor(ren, 255, 255, 0, 255); // Yellow for Sector
+            }
+            
             // Draw Line
             SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
             
-            // Draw Tick
-             float nx = -(y2 - y1);
-             float ny = (x2 - x1);
+            // Draw Tick Normal (Inward)
+             float nx = (y2 - y1);
+             float ny = -(x2 - x1);
              float len = sqrtf(nx*nx + ny*ny);
              if (len > 0) {
                  nx /= len; ny /= len;
                  SDL_RenderDrawLineF(ren, (x1+x2)/2, (y1+y2)/2, (x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8);
              }
+             
+             // Vertices (5x5)
+             Color v_col = {255, 255, 0, 255}; // Default Sector Yellow
+             if ((int)i == highlight_wall_index) v_col = (Color){0, 255, 255, 255}; // Cyan
+             else if ((int)i == hovered_wall_index) v_col = (Color){0, 255, 0, 255}; // Lime Green
+             
+             SDL_SetRenderDrawColor(ren, v_col.r, v_col.g, v_col.b, v_col.a);
+             SDL_FRect r = {x1 - 2, y1 - 2, 5, 5};
+             SDL_RenderFillRectF(ren, &r);
         }
     }
     
@@ -466,5 +483,3 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
     
     SDL_RenderSetViewport(ren, NULL);
 }
-
-
