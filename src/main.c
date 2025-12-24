@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
     TextureID tex_wall = Texture_Load("textures/modern/inner_wall_1.png");
     TextureID tex_floor = Texture_Load("textures/grid_blue.png");
     TextureID tex_ceil = Texture_Load("textures/grid_blue.png");
+    TextureID tex_wood = Texture_Load("textures/modern/wood_0.png");
 
     // 2. Setup Test World (3 Connected Sectors)
     // Sector 0 -> Portal to 1
@@ -72,24 +73,24 @@ int main(int argc, char** argv) {
     
     Wall walls[] = {
         // Sector 0 (0-5)
-        { {0, 0}, {4, 0}, -1, tex_wall },
-        { {4, 0}, {4, 1}, -1, tex_wall },
-        { {4, 1}, {4, 3},  1, -1 }, // P->1
-        { {4, 3}, {4, 4}, -1, tex_wall },
-        { {4, 4}, {0, 4}, -1, tex_wall },
-        { {0, 4}, {0, 0}, -1, tex_wall },
+        { {0, 0}, {4, 0}, -1, tex_wall, -1, -1 },
+        { {4, 0}, {4, 1}, -1, tex_wall, -1, -1 },
+        { {4, 1}, {4, 3},  1, -1, tex_wood, tex_wood }, // P->1
+        { {4, 3}, {4, 4}, -1, tex_wall, -1, -1 },
+        { {4, 4}, {0, 4}, -1, tex_wall, -1, -1 },
+        { {0, 4}, {0, 0}, -1, tex_wall, -1, -1 },
         
         // Sector 1 (6-11)
-        { {4, 1}, {8, 1}, -1, tex_wall }, // Top wall
-        { {8, 1}, {8, 3},  2, -1 }, // P->2 (East)
-        { {8, 3}, {4, 3}, -1, tex_wall }, // Bottom wall
-        { {4, 3}, {4, 1},  0, -1 }, // P->0 (West)
+        { {4, 1}, {8, 1}, -1, tex_wall, -1, -1 }, // Top wall
+        { {8, 1}, {8, 3},  2, -1, tex_wood, tex_wood }, // P->2 (East)
+        { {8, 3}, {4, 3}, -1, tex_wall, -1, -1 }, // Bottom wall
+        { {4, 3}, {4, 1},  0, -1, tex_wood, tex_wood }, // P->0 (West)
         
         // Sector 2 (10-13) - Let's make it a small room
-        { {8, 1}, {10, 1}, -1, tex_wall },
-        { {10, 1}, {10, 3}, -1, tex_wall },
-        { {10, 3}, {8, 3}, -1, tex_wall },
-        { {8, 3}, {8, 1},  1, -1 } // P->1
+        { {8, 1}, {10, 1}, -1, tex_wall, -1, -1 },
+        { {10, 1}, {10, 3}, -1, tex_wall, -1, -1 },
+        { {10, 3}, {8, 3}, -1, tex_wall, -1, -1 },
+        { {8, 3}, {8, 1},  1, -1, tex_wood, tex_wood } // P->1
     };
     
     Sector sectors[] = {

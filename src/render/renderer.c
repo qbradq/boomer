@@ -230,16 +230,104 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
             }
             
             // Wall / Portal Window
-            int wy_top = max(y_ceil, cy_top);
-            int wy_bot = min(y_floor, cy_bot);
+            // If Solid: Draw from y_ceil to y_floor
+            // If Portal:
+            //    Draw Top Wall: y_ceil to ny_ceil (if ny_ceil > y_ceil)
+            //    Draw Bot Wall: ny_floor to y_floor (if ny_floor < y_floor)
+            //    Window is ny_ceil to ny_floor
             
-            if (wy_top < wy_bot) {
-                if (portal) {
-                    // Save for recursion
-                    next_y_top[x] = wy_top;
-                    next_y_bot[x] = wy_bot;
-                } else {
-                    // Draw Solid Wall
+            Texture* top_tex = Texture_Get(wall->top_texture_id);
+            Texture* bot_tex = Texture_Get(wall->bottom_texture_id);
+
+            int wy_top = cy_top;
+            int wy_bot = cy_bot;
+            
+            if (portal) {
+                Sector* next_s = &map->sectors[wall->next_sector];
+                f32 n_ceil_h = next_s->ceil_height - cam.pos.z;
+                f32 n_floor_h = next_s->floor_height - cam.pos.z;
+                
+                f32 ny1a = center_y - (n_ceil_h / c1.x) * scale;
+                f32 ny1b = center_y - (n_floor_h / c1.x) * scale;
+                f32 ny2a = center_y - (n_ceil_h / c2.x) * scale;
+                f32 ny2b = center_y - (n_floor_h / c2.x) * scale;
+                
+                f32 ny_ceil_f = ny1a + (ny2a - ny1a) * t_screen;
+                f32 ny_floor_f = ny1b + (ny2b - ny1b) * t_screen;
+                
+                int ny_ceil = (int)ny_ceil_f;
+                int ny_floor = (int)ny_floor_f;
+                
+                // --- Upper Wall (Transom) ---
+                // From Current Ceil (Small Y) to Neighbor Ceil (Large Y)
+                int u_start = max(y_ceil, cy_top);
+                int u_end = min(ny_ceil, cy_bot);
+                
+                if (u_start < u_end) {
+                     if (top_tex) {
+                        f32 iz = iz1 + (iz2 - iz1) * t_screen;
+                        f32 uz = uz1 + (uz2 - uz1) * t_screen;
+                        f32 u = uz / iz; 
+                        int tex_x = (int)u;
+                        
+                        // V Mapping for upper wall
+                        // Let's stretch? Or align to bottom?
+                        // Align V=0 to Current Ceil (y_ceil).
+                        float v_step = 64.0f / (y_floor_f - y_ceil_f); // Use Main Wall scale approximation? Or re-derive per pixel?
+                         // Better: Calculate world height of THIS segment?
+                         // h = (CurrentCeil - NeighborCeil)
+                         // v_scale = h * 64
+                         // But we want it pixel perfect perspective.
+                         // Linear approximation `v_step` derived from `1/z` is better.
+                         // But for now, let's use the same `v_step` derivation as main wall but scaled?
+                         // Let's just use `Texture_DrawColumn` scaling logic from the main wall logic for now.
+                         // Assuming the texture fits the "Gap" or repeats.
+                        
+                        f32 world_h = (sector->ceil_height - next_s->ceil_height);
+                        f32 v_scale = world_h * 64.0f;
+                        float pixel_h = ny_ceil_f - y_ceil_f;
+                        float v_s = v_scale / pixel_h;
+                        
+                        Video_DrawTexturedColumn(x, u_start, u_end - 1, top_tex, tex_x, (u_start - y_ceil_f) * v_s, v_s);
+                     } else {
+                         Video_DrawVertLine(x, u_start, u_end - 1, (Color){80, 80, 80, 255});
+                     }
+                }
+                
+                // --- Lower Wall (Step) ---
+                // From Neighbor Floor (Small Y) to Current Floor (Large Y)
+                int b_start = max(ny_floor, cy_top);
+                int b_end = min(y_floor, cy_bot);
+                
+                if (b_start < b_end) {
+                    if (bot_tex) {
+                        f32 iz = iz1 + (iz2 - iz1) * t_screen;
+                        f32 uz = uz1 + (uz2 - uz1) * t_screen;
+                        f32 u = uz / iz; 
+                        int tex_x = (int)u;
+                        
+                        // V Mapping
+                        f32 world_h = (next_s->floor_height - sector->floor_height);
+                        f32 v_scale = world_h * 64.0f;
+                        float pixel_h = y_floor_f - ny_floor_f;
+                        float v_s = v_scale / pixel_h;
+                        
+                        Video_DrawTexturedColumn(x, b_start, b_end - 1, bot_tex, tex_x, (b_start - ny_floor_f) * v_s, v_s);
+                    } else {
+                        Video_DrawVertLine(x, b_start, b_end - 1, (Color){80, 80, 80, 255});
+                    }
+                }
+                
+                // Update Window for Recursion
+                wy_top = max(ny_ceil, cy_top);
+                wy_bot = min(ny_floor, cy_bot);
+                
+            } else {
+                // Not a portal - Draw Solid Wall
+                int w_start = max(y_ceil, cy_top);
+                int w_end = min(y_floor, cy_bot);
+                
+                if (w_start < w_end) {
                     if (wall_tex) {
                         f32 iz = iz1 + (iz2 - iz1) * t_screen;
                         f32 uz = uz1 + (uz2 - uz1) * t_screen;
@@ -250,19 +338,24 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
                         f32 world_height = sector->ceil_height - sector->floor_height;
                         float v_scale = world_height * 64.0f;
                         float v_start = 0.0f;
-                        float v_end = v_scale; 
+                        // float v_end = v_scale; 
                         float height = y_floor_f - y_ceil_f;
-                        float v_step = (v_end - v_start) / height;
+                        float v_step = v_scale / height;
                         
-                        Video_DrawTexturedColumn(x, wy_top, wy_bot - 1, wall_tex, tex_x, v_start + (wy_top - y_ceil_f) * v_step, v_step);
+                        Video_DrawTexturedColumn(x, w_start, w_end - 1, wall_tex, tex_x, (w_start - y_ceil_f) * v_step, v_step);
                     } else {
-                        Video_DrawVertLine(x, wy_top, wy_bot - 1, (Color){100, 100, 100, 255});
+                        Video_DrawVertLine(x, w_start, w_end - 1, (Color){100, 100, 100, 255});
                     }
                 }
+            }
+            
+            if (wy_top < wy_bot) {
+                if (portal) {
+                    // Save for recursion
+                    next_y_top[x] = wy_top;
+                    next_y_bot[x] = wy_bot;
+                }
             } else {
-                // Determine if we need to close the portal gap?
-                // If wy_top >= wy_bot, the portal is effectively closed/occluded.
-                // We should probably mark it as such for recursion.
                 if (portal) {
                    next_y_top[x] = VIDEO_HEIGHT; // Invalid
                    next_y_bot[x] = -1;

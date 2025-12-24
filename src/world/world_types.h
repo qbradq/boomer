@@ -8,10 +8,11 @@ typedef i32 SectorID;
 typedef i32 WallID;
 
 typedef struct {
-    Vec2 p1;            // Start vertex
-    Vec2 p2;            // End vertex
-    SectorID next_sector; // -1 if solid wall, otherwise ID of connected sector
-    i32 texture_id;     // -1 if none
+    Vec2 p1, p2;
+    SectorID next_sector; // -1 if solid
+    i32 texture_id; // Main wall texture
+    i32 top_texture_id; // Wall above portal
+    i32 bottom_texture_id; // Wall below portal
     
     // Future: Texture IDs, UV scales, etc.
 } Wall;
