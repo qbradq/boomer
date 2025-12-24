@@ -46,17 +46,32 @@ void Editor_Init(SDL_Window* window, SDL_Renderer* renderer) {
     printf("Editor Initialized.\n");
 }
 
+void Editor_InputBegin(void) {
+    if (!is_active) return;
+    nk_input_begin(ctx);
+}
+
+void Editor_InputEnd(void) {
+    if (!is_active) return;
+    nk_input_end(ctx);
+}
+
 bool Editor_HandleEvent(SDL_Event* event) {
     if (!is_active) return false;
     
-    nk_input_begin(ctx);
     nk_sdl_handle_event(event);
-    nk_input_end(ctx);
     
     // Capture input if hovering UI
-    if (nk_window_is_any_hovered(ctx)) return true;
+    // Note: This might need to be checked AFTER InputEnd for accuracy for the *next* frame logic?
+    // But usually determining if we *swallowed* this specific event is tricky with immediate mode.
+    // If we are over a window, we swallow mouse clicks.
     
-    // Also capture input if we are editing text?
+    if (nk_window_is_any_hovered(ctx)) {
+        // If mouse event, swallow it.
+        // If keyboard? Maybe separate check.
+        return true; 
+    }
+    
     return false;
 }
 
@@ -120,14 +135,24 @@ void Editor_Render(struct Map* map, struct Camera* cam) {
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
         NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE)) {
         
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label(ctx, "View Mode:", NK_TEXT_LEFT);
-        if (nk_option_label(ctx, "3D Game View", view_mode == 0)) view_mode = 0;
-        if (nk_option_label(ctx, "2D Map View", view_mode == 1)) view_mode = 1;
-
-        nk_layout_row_dynamic(ctx, 30, 1);
-        if (nk_button_label(ctx, "Exit Editor")) {
-            Editor_Toggle();
+        // Toolbar Row
+        nk_layout_row_static(ctx, 30, 30, 2);
+        
+        // 1. View Toggle
+        if (view_mode == 0) {
+            if (nk_button_symbol(ctx, NK_SYMBOL_RECT_SOLID)) {
+                view_mode = 1;
+            }
+        } else {
+            if (nk_button_symbol(ctx, NK_SYMBOL_TRIANGLE_RIGHT)) {
+                view_mode = 0;
+            }
+        }
+        
+        // 2. Exit Editor
+        // NK_SYMBOL_MAX acts as a nice 'X' or similar, or we can use NK_SYMBOL_X
+        if (nk_button_symbol(ctx, NK_SYMBOL_X)) {
+             Editor_Toggle();
         }
         
         if (selected_sector != -1) {
@@ -169,6 +194,11 @@ bool Editor_IsActive(void) {
 
 void Editor_Toggle(void) {
     is_active = !is_active;
+    if (is_active) {
+        // Flush input state to prevent stale clicks (e.g. Exit button) from triggering immediately
+        nk_input_begin(ctx);
+        nk_input_end(ctx);
+    }
     printf("Editor Mode: %s\n", is_active ? "ON" : "OFF");
 }
 

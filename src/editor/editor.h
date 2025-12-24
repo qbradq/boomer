@@ -11,6 +11,11 @@ struct Camera;
 void Editor_Init(SDL_Window* window, SDL_Renderer* renderer);
 
 // Handle SDL Events for Editor
+// Editor Input Frame Control
+void Editor_InputBegin(void);
+void Editor_InputEnd(void);
+
+// Pass SDL Event to Editor (Call between Begin/End)
 // Returns true if the editor consumed the event
 bool Editor_HandleEvent(SDL_Event* event);
 

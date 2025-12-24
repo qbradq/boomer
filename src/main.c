@@ -113,7 +113,12 @@ int main(int argc, char** argv) {
     bool editor_has_focus = false;
 
     while (running) {
+        // Capture Editor State at start of frame to ensure consistent Input Begin/End pairing
+        bool editor_was_active = Editor_IsActive();
+
         // Input Poll
+        if (editor_was_active) Editor_InputBegin();
+        
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
              // Global Toggles
@@ -123,8 +128,9 @@ int main(int argc, char** argv) {
                 }
             }
             
-            // Pass to Editor
-            if (Editor_IsActive()) {
+            // Pass to Editor (if it was active at start of frame)
+            // Even if we toggle OFF during this frame, we finish the input frame for the editor.
+            if (editor_was_active) {
                 if (Editor_HandleEvent(&event)) {
                     editor_has_focus = true; // Mouse is over UI
                 } else {
@@ -151,6 +157,8 @@ int main(int argc, char** argv) {
                 }
             }
         }
+        
+        if (editor_was_active) Editor_InputEnd();
         
         // Game Input Handling
         if (!Editor_IsActive()) {
