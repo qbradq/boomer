@@ -72,5 +72,7 @@ CMakeUserPresets.json
 /build
 
 # Working files
+/PROMPT.md
 PROMPT.md
+/PROMPT.*.md
 PROMPT.*.md

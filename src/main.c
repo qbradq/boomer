@@ -10,8 +10,29 @@
 #include "video/video.h"
 #include "render/renderer.h"
 #include "world/world_types.h"
+#include "core/fs.h"
+#include <stdio.h> // For logging FS test
 
-int main(int argc, char* argv[]) {
+int main(int argc, char** argv) {
+    const char* asset_path = "games/demo";
+    if (argc > 1) {
+        asset_path = argv[1];
+    }
+    
+    // 0. Init FS
+    if (!FS_Init(asset_path)) {
+        printf("WARNING: Could not mount '%s'\n", asset_path);
+    } else {
+        size_t sz;
+        char* data = FS_ReadFile("test.txt", &sz);
+        if (data) {
+            printf("FS TEST: Read 'test.txt' (%zu bytes): %s\n", sz, data);
+            FS_FreeFile(data);
+        } else {
+            printf("FS TEST: Could not find 'test.txt'\n");
+        }
+    }
+
     // 1. Initialize Video
     if (!Video_Init("Boomer Engine - Phase 3 Solid")) {
         return 1;

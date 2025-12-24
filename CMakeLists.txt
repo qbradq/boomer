@@ -49,17 +49,27 @@ if(NOT TARGET lua)
     endif()
 endif()
 
-add_executable(boomer src/main.c src/video/video.c src/render/renderer.c src/world/world.c)
+# Fetch miniz (zip reader)
+FetchContent_Declare(
+    miniz
+    GIT_REPOSITORY https://github.com/richgel999/miniz.git
+    GIT_TAG 2.2.0
+)
+FetchContent_MakeAvailable(miniz)
+
+add_executable(boomer src/main.c src/video/video.c src/render/renderer.c src/world/world.c src/core/fs.c)
 
 # Include directories
 target_include_directories(boomer PRIVATE 
-    ${stb_SOURCE_DIR} 
-    ${SDL2_SOURCE_DIR}/include
+    src 
+    ${SDL2_INCLUDE_DIRS} 
+    ${stb_SOURCE_DIR}
     ${lua_SOURCE_DIR}
+    ${miniz_SOURCE_DIR}
 )
 
 # Link libraries
-target_link_libraries(boomer PRIVATE SDL2::SDL2 m lua)
+target_link_libraries(boomer PRIVATE SDL2::SDL2 -lm lua miniz)
 
 # Copy compile commands for tooling
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
