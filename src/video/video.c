@@ -11,36 +11,37 @@ static SDL_Texture* texture = NULL;
 static u32 frame_buffer[VIDEO_WIDTH * VIDEO_HEIGHT];
 u32* video_pixels = frame_buffer;
 
+static int current_scale = 4;
+static bool is_fullscreen = false;
+
 bool Video_Init(const char* title) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        printf("SDL Init Failed: %s\n", SDL_GetError());
         return false;
     }
 
-    int window_width  = VIDEO_WIDTH * VIDEO_SCALE;
-    int window_height = VIDEO_HEIGHT * VIDEO_SCALE;
+    int width = VIDEO_WIDTH * current_scale;
+    int height = VIDEO_HEIGHT * current_scale;
 
-    window = SDL_CreateWindow(title,
-                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              window_width, window_height,
-                              SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow(title, 
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
+        width, height, 
+        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        
     if (!window) {
-        fprintf(stderr, "Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        printf("Window Create Failed: %s\n", SDL_GetError());
         return false;
     }
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) {
-        fprintf(stderr, "Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
+        printf("Renderer Create Failed: %s\n", SDL_GetError());
         return false;
     }
 
-    texture = SDL_CreateTexture(renderer,
-                                SDL_PIXELFORMAT_RGBA32,
-                                SDL_TEXTUREACCESS_STREAMING,
-                                VIDEO_WIDTH, VIDEO_HEIGHT);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, VIDEO_WIDTH, VIDEO_HEIGHT);
     if (!texture) {
-        fprintf(stderr, "Texture could not be created! SDL_Error: %s\n", SDL_GetError());
+        printf("Texture Create Failed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -48,10 +49,40 @@ bool Video_Init(const char* title) {
 }
 
 void Video_Shutdown(void) {
-    if (texture)  SDL_DestroyTexture(texture);
+    if (texture) SDL_DestroyTexture(texture);
     if (renderer) SDL_DestroyRenderer(renderer);
-    if (window)   SDL_DestroyWindow(window);
+    if (window) SDL_DestroyWindow(window);
     SDL_Quit();
+}
+
+void Video_ChangeScale(int delta) {
+    if (is_fullscreen) return; // Don't resize in fullscreen mode? Or update for when we exit.
+
+    current_scale += delta;
+    if (current_scale < 1) current_scale = 1;
+    if (current_scale > 12) current_scale = 12;
+
+    int w = VIDEO_WIDTH * current_scale;
+    int h = VIDEO_HEIGHT * current_scale;
+
+    SDL_SetWindowSize(window, w, h);
+    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    printf("Window Scale: %dx (%dx%d)\n", current_scale, w, h);
+}
+
+void Video_ToggleFullscreen(void) {
+    is_fullscreen = !is_fullscreen;
+
+    if (is_fullscreen) {
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // Borderless
+    } else {
+        SDL_SetWindowFullscreen(window, 0);
+        // Restore size
+        int w = VIDEO_WIDTH * current_scale;
+        int h = VIDEO_HEIGHT * current_scale;
+        SDL_SetWindowSize(window, w, h);
+        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
 }
 
 void Video_Clear(Color color) {
@@ -68,8 +99,32 @@ void Video_PutPixel(int x, int y, Color color) {
 
 void Video_Present(void) {
     SDL_UpdateTexture(texture, NULL, video_pixels, VIDEO_WIDTH * sizeof(u32));
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
+
+    SDL_RenderClear(renderer); // Clear backing (black)
+
+    if (is_fullscreen) {
+        // Integer Scaling
+        int w, h;
+        SDL_GetWindowSize(window, &w, &h);
+
+        int scale_w = w / VIDEO_WIDTH;
+        int scale_h = h / VIDEO_HEIGHT;
+        int scale = (scale_w < scale_h) ? scale_w : scale_h;
+        if (scale < 1) scale = 1;
+
+        SDL_Rect dst;
+        dst.w = VIDEO_WIDTH * scale;
+        dst.h = VIDEO_HEIGHT * scale;
+        dst.x = (w - dst.w) / 2;
+        dst.y = (h - dst.h) / 2;
+
+        SDL_RenderCopy(renderer, texture, NULL, &dst);
+
+    } else {
+        // Windowed - Fill Window (which is set to integer multiple anyway)
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+    }
+
     SDL_RenderPresent(renderer);
 }
 

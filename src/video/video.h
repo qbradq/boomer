@@ -8,7 +8,7 @@ typedef struct Texture Texture;
 
 // Video configuration
 #define VIDEO_WIDTH  320
-#define VIDEO_HEIGHT 200
+#define VIDEO_HEIGHT 180
 #define VIDEO_SCALE  4
 
 extern u32* video_pixels;
@@ -18,6 +18,12 @@ bool Video_Init(const char* title);
 
 // Shutdown the video system
 void Video_Shutdown(void);
+
+// Change window scale (relative to delta, clamped 1-12)
+void Video_ChangeScale(int delta);
+
+// Toggle borderless fullscreen with integer scaling
+void Video_ToggleFullscreen(void);
 
 // Clear the framebuffer with a specific color
 void Video_Clear(Color color);

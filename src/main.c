@@ -126,9 +126,22 @@ int main(int argc, char** argv) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
+            } else if (event.type == SDL_KEYDOWN) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_F9:
+                        Video_ChangeScale(-1);
+                        break;
+                    case SDLK_F11:
+                        Video_ChangeScale(1);
+                        break;
+                    case SDLK_F10:
+                        Video_ToggleFullscreen();
+                        break;
+                    case SDLK_ESCAPE:
+                        running = false;
+                        break;
+                }
             }
-            // The original code had an SDLK_ESCAPE check here, but the new snippet removes it.
-            // If it's desired, it should be re-added. For now, following the snippet.
         }
         
         // Input Handling
