@@ -3,8 +3,9 @@
 
 #include "../core/types.h"
 #include <stdbool.h>
+#include <SDL.h>
 
-typedef struct Texture Texture;
+struct Texture; // Forward declaration
 
 // Video configuration
 #define VIDEO_WIDTH  320
@@ -28,20 +29,26 @@ void Video_ToggleFullscreen(void);
 // Clear the framebuffer with a specific color
 void Video_Clear(Color color);
 
-// draw a pixel to the framebuffer
+// Set a pixel in the framebufferSAFE
 void Video_PutPixel(int x, int y, Color color);
 
-// draw a line to the framebuffer
+// Draw a line
 void Video_DrawLine(int x0, int y0, int x1, int y1, Color color);
 
-// Draw Vertical Line (Solid Color)
+// Draw a vertical line
 void Video_DrawVertLine(int x, int y1, int y2, Color color);
 
-// Draw Textured Vertical Column
-// tex_x: U coordinate (integer 0..width-1)
-// v_start: V coordinate at y_start
-// v_step: How much V advances per screen pixel
-void Video_DrawTexturedColumn(int x, int y_start, int y_end, Texture* tex, int tex_x, float v_start, float v_step);
+// Draw a textured column
+void Video_DrawTexturedColumn(int x, int y_start, int y_end, struct Texture* tex, int tex_x, float v_start, float v_step);
+
+// --- Advanced Rendering Pipeline (For Editor) ---
+void Video_BeginFrame(void);
+void Video_DrawGame(SDL_Rect* dst_rect); // If NULL, fills screen/window
+void Video_EndFrame(void);
+
+// Accessors for Nuklear/Editor
+SDL_Window* Video_GetWindow(void);
+SDL_Renderer* Video_GetRenderer(void);
 
 // Present the framebuffer to the screen
 void Video_Present(void);

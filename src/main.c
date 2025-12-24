@@ -12,10 +12,9 @@
 #include "render/renderer.h"
 #include "world/world_types.h"
 #include "core/fs.h"
-#include <stdio.h> // For logging FS test
-
 #include "core/lua_sys.h"
 #include "game/entity.h"
+#include "editor/editor.h"
 
 typedef struct {
     bool forward, backward, left, right;
@@ -33,14 +32,7 @@ int main(int argc, char** argv) {
     if (!FS_Init(asset_path)) {
         printf("WARNING: Could not mount '%s'\n", asset_path);
     } else {
-        size_t sz;
-        char* data = FS_ReadFile("test.txt", &sz);
-        if (data) {
-            printf("FS TEST: Read 'test.txt' (%zu bytes): %s\n", sz, data);
-            FS_FreeFile(data);
-        } else {
-            printf("FS TEST: Could not find 'test.txt'\n");
-        }
+        printf("FS Mounted: %s\n", asset_path);
     }
     
     // 0.5 Init Lua
@@ -53,9 +45,12 @@ int main(int argc, char** argv) {
     Entity_Init();
 
     // 1. Initialize Video
-    if (!Video_Init("Boomer Engine - Phase 4 Portals")) {
+    if (!Video_Init("Boomer Engine - Phase 11 Editor")) {
         return 1;
     }
+    
+    // Init Editor
+    Editor_Init(Video_GetWindow(), Video_GetRenderer());
     
     Renderer_Init();
     Texture_Init();
@@ -67,10 +62,6 @@ int main(int argc, char** argv) {
     TextureID tex_wood = Texture_Load("textures/modern/wood_0.png");
 
     // 2. Setup Test World (3 Connected Sectors)
-    // Sector 0 -> Portal to 1
-    // Sector 1 -> Portal to 0, Portal to 2
-    // Sector 2 -> Portal to 1
-    
     Wall walls[] = {
         // Sector 0 (0-5)
         { {0, 0}, {4, 0}, -1, tex_wall, -1, -1 },
@@ -119,11 +110,28 @@ int main(int argc, char** argv) {
     bool running = true;
     InputState input = {0};
     u32 last_time = SDL_GetTicks();
+    bool editor_has_focus = false;
 
     while (running) {
         // Input Poll
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+             // Global Toggles
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_F12) {
+                    Editor_Toggle();
+                }
+            }
+            
+            // Pass to Editor
+            if (Editor_IsActive()) {
+                if (Editor_HandleEvent(&event)) {
+                    editor_has_focus = true; // Mouse is over UI
+                } else {
+                    editor_has_focus = false;
+                }
+            }
+
             if (event.type == SDL_QUIT) {
                 running = false;
             } else if (event.type == SDL_KEYDOWN) {
@@ -144,32 +152,35 @@ int main(int argc, char** argv) {
             }
         }
         
-        // Input Handling
-        const u8* keys = SDL_GetKeyboardState(NULL);
-        input.forward = keys[SDL_SCANCODE_W];
-        input.backward = keys[SDL_SCANCODE_S];
-        input.left = keys[SDL_SCANCODE_A]; // Strafe
-        input.right = keys[SDL_SCANCODE_D]; // Strafe
-        input.turn_left = keys[SDL_SCANCODE_LEFT];
-        input.turn_right = keys[SDL_SCANCODE_RIGHT];
-        input.u = keys[SDL_SCANCODE_Q];
-        input.d = keys[SDL_SCANCODE_E];
+        // Game Input Handling
+        if (!Editor_IsActive()) {
+            const u8* keys = SDL_GetKeyboardState(NULL);
+            input.forward = keys[SDL_SCANCODE_W];
+            input.backward = keys[SDL_SCANCODE_S];
+            input.left = keys[SDL_SCANCODE_A]; 
+            input.right = keys[SDL_SCANCODE_D]; 
+            input.turn_left = keys[SDL_SCANCODE_LEFT];
+            input.turn_right = keys[SDL_SCANCODE_RIGHT];
+            input.u = keys[SDL_SCANCODE_Q];
+            input.d = keys[SDL_SCANCODE_E];
+        } else {
+             input = (InputState){0};
+        }
 
         u32 current_time = SDL_GetTicks();
         f32 dt = (current_time - last_time) / 1000.0f;
         last_time = current_time;
         
-        // Camera Update
+        // Cam Update
         f32 move_speed = 3.0f * dt;
         f32 rot_speed = 2.0f * dt;
         
-        if (input.turn_left) cam.yaw += rot_speed; // PLUS for Left (Standard CCW)
-        if (input.turn_right) cam.yaw -= rot_speed; // MINUS for Right
+        if (input.turn_left) cam.yaw += rot_speed;
+        if (input.turn_right) cam.yaw -= rot_speed; 
 
         f32 cs = cosf(cam.yaw);
         f32 sn = sinf(cam.yaw);
         
-        // Forward/Back
         if (input.forward) {
             cam.pos.x += cs * move_speed;
             cam.pos.y += sn * move_speed;
@@ -178,32 +189,50 @@ int main(int argc, char** argv) {
             cam.pos.x -= cs * move_speed;
             cam.pos.y -= sn * move_speed;
         }
-        
-        // Strafe
         if (input.left) {
-            cam.pos.x -= sn * move_speed; // -sin, +cos for left vector (-90 deg)
+            cam.pos.x -= sn * move_speed;
             cam.pos.y += cs * move_speed;
         }
         if (input.right) {
             cam.pos.x += sn * move_speed;
             cam.pos.y -= cs * move_speed;
         }
-        
-        // Fly
         if (input.u) cam.pos.z += move_speed;
         if (input.d) cam.pos.z -= move_speed;
-
-        // Entity Update
+        
         Entity_Update(dt);
 
-        // Render
-        Video_Clear((Color){20, 20, 30, 255}); // Dark blue background
+        // --- RENDER PIPELINE ---
+        Video_BeginFrame();
         
-        Render_Frame(cam, &map);
+        if (Editor_IsActive()) {
+            // EDITOR MODE
+            int view = Editor_GetViewMode();
+            if (view == 0) {
+                // 3D View (in a window? For now fill screen behind UI)
+                Render_Frame(cam, &map);
+                Video_DrawGame(NULL); // Fill
+            } else {
+                // 2D View
+                int w, h;
+                SDL_GetWindowSize(Video_GetWindow(), &w, &h);
+                Render_Map2D(Video_GetRenderer(), &map, cam, 0, 0, w, h, 32.0f); // 32 pixels per unit zoom
+            }
+            
+            // Draw UI
+            Editor_Render();
+            
+        } else {
+            // GAME MODE
+            Video_Clear((Color){20, 20, 30, 255}); 
+            Render_Frame(cam, &map);
+            Video_DrawGame(NULL);
+        }
 
-        Video_Present();
+        Video_EndFrame();
     }
-
+    
+    Editor_Shutdown();
     Video_Shutdown();
     Texture_Shutdown();
     Lua_Shutdown();

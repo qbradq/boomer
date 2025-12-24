@@ -97,35 +97,52 @@ void Video_PutPixel(int x, int y, Color color) {
     video_pixels[y * VIDEO_WIDTH + x] = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
 }
 
-void Video_Present(void) {
+// Accessors
+SDL_Window* Video_GetWindow(void) { return window; }
+SDL_Renderer* Video_GetRenderer(void) { return renderer; }
+
+void Video_BeginFrame(void) {
     SDL_UpdateTexture(texture, NULL, video_pixels, VIDEO_WIDTH * sizeof(u32));
-
     SDL_RenderClear(renderer); // Clear backing (black)
+}
 
-    if (is_fullscreen) {
-        // Integer Scaling
-        int w, h;
-        SDL_GetWindowSize(window, &w, &h);
-
-        int scale_w = w / VIDEO_WIDTH;
-        int scale_h = h / VIDEO_HEIGHT;
-        int scale = (scale_w < scale_h) ? scale_w : scale_h;
-        if (scale < 1) scale = 1;
-
-        SDL_Rect dst;
-        dst.w = VIDEO_WIDTH * scale;
-        dst.h = VIDEO_HEIGHT * scale;
-        dst.x = (w - dst.w) / 2;
-        dst.y = (h - dst.h) / 2;
-
-        SDL_RenderCopy(renderer, texture, NULL, &dst);
-
+void Video_DrawGame(SDL_Rect* dst_rect) {
+    if (dst_rect) {
+        SDL_RenderCopy(renderer, texture, NULL, dst_rect);
     } else {
-        // Windowed - Fill Window (which is set to integer multiple anyway)
-        SDL_RenderCopy(renderer, texture, NULL, NULL);
+        if (is_fullscreen) {
+            // Integer Scaling Logic
+            int w, h;
+            SDL_GetWindowSize(window, &w, &h);
+            
+            int scale_w = w / VIDEO_WIDTH;
+            int scale_h = h / VIDEO_HEIGHT;
+            int scale = (scale_w < scale_h) ? scale_w : scale_h;
+            if (scale < 1) scale = 1;
+            
+            SDL_Rect dst;
+            dst.w = VIDEO_WIDTH * scale;
+            dst.h = VIDEO_HEIGHT * scale;
+            dst.x = (w - dst.w) / 2;
+            dst.y = (h - dst.h) / 2;
+            
+            SDL_RenderCopy(renderer, texture, NULL, &dst);
+        } else {
+            // Windowed - Fill Window
+            SDL_RenderCopy(renderer, texture, NULL, NULL);
+        }
     }
+}
 
+void Video_EndFrame(void) {
     SDL_RenderPresent(renderer);
+}
+
+// Deprecated / Wrapper
+void Video_Present(void) {
+    Video_BeginFrame();
+    Video_DrawGame(NULL);
+    Video_EndFrame();
 }
 
 void Video_DrawLine(int x0, int y0, int x1, int y1, Color color) {

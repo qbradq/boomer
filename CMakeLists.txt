@@ -57,7 +57,29 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(miniz)
 
-add_executable(boomer src/main.c src/video/video.c src/render/renderer.c src/world/world.c src/core/fs.c src/core/lua_sys.c src/game/entity.c src/video/texture.c)
+# Fetch Nuklear (Immediate Mode GUI)
+FetchContent_Declare(
+  nuklear
+  GIT_REPOSITORY https://github.com/Immediate-Mode-UI/Nuklear.git
+  GIT_TAG master
+)
+FetchContent_MakeAvailable(nuklear)
+
+# Create Interface Library for Nuklear (Header Only)
+add_library(nuklear INTERFACE)
+target_include_directories(nuklear INTERFACE ${nuklear_SOURCE_DIR})
+
+add_executable(boomer
+  src/main.c
+  src/video/video.c
+  src/video/texture.c
+  src/render/renderer.c
+  src/world/world.c
+  src/core/fs.c
+  src/core/lua_sys.c
+  src/game/entity.c
+  src/editor/editor.c
+)
 
 # Include directories
 target_include_directories(boomer PRIVATE 
@@ -66,6 +88,8 @@ target_include_directories(boomer PRIVATE
     ${stb_SOURCE_DIR}
     ${lua_SOURCE_DIR}
     ${miniz_SOURCE_DIR}
+    ${nuklear_SOURCE_DIR}
+    ${nuklear_SOURCE_DIR}/demo/sdl_renderer
 )
 
 # Link libraries

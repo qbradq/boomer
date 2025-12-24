@@ -17,7 +17,11 @@ void Renderer_Init(void);
 // Returns true if the vertex is behind the camera (and should be clipped/ignored)
 bool WorldToScreen(Vec3 world_pos, Camera cam, Vec2* screen_out);
 
-// Render the map from the camera's perspective (wireframe for now)
+// Render the map from the camera's perspective// Render the full scene
 void Render_Frame(Camera cam, Map* map);
+
+// Render Top-Down Map (High Resolution via SDL)
+struct SDL_Renderer;
+void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom);
 
 #endif // BOOMER_RENDERER_H
