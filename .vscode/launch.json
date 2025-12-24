@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug C Program",
+            "name": "Debug (Dev)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/boomer",  // Replace with your executable name
+            "program": "${workspaceFolder}/build/dev/boomer",  // Replace with your executable name
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -19,7 +19,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "CMake: build",
+            "preLaunchTask": "CMake: build-dev",
             "miDebuggerPath": "gdb"
         }
     ]

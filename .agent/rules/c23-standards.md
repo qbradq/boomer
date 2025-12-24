@@ -1,0 +1,23 @@
+---
+trigger: always_on
+glob:
+description:
+---
+# C23 Language Standards
+
+## Required Practices
+- Always use `-std=c23` or `#pragma clang diagnostic` for C23 features.
+- Prefer `bool`, `true`, `false` from `<stdbool.h>`.
+- Use `#embed` for binary data inclusion.
+- Utilize `nullptr`, `nullptr_t` from `<stddef.h>`.
+- Apply `[[likely]]`, `[[unlikely]]` attributes on branches.
+- Use `stdckd_*` functions for checked arithmetic.
+
+## Headers and Modules
+- Include `<stdbit.h>` for bit utilities (`stdc_*` functions).
+- Use `<uchar.h>` for UTF-8/16/32 strings.
+- Prefer `char8_t`, `char16_t`, `char32_t` literals.
+
+## Prohibited Patterns
+- No C11 `restrict` - use C23 `[[restrict]]` if needed.
+- Avoid `typeof` - use `typeof_unequal` from `<stdtype.h>`.
