@@ -19,34 +19,40 @@ int main(int argc, char* argv[]) {
     
     Renderer_Init();
 
-    // 2. Setup Test World
-    Wall walls[] = {
-        // Sector 0 (Triangle)
-        { {1, 1}, {3, 2}, -1 },
-        { {3, 2}, {2, 4}, -1 },
-        { {2, 4}, {1, 1}, -1 },
+    // 2. Setup Test World (2 Connected Sectors)
+    // Sector 0 (Big Room) - 6 Walls
+    // Sector 1 (Small Room) - 4 Walls
+    
+    static Wall walls[] = {
+        // Sector 0
+        { {0, 0}, {4, 0}, -1 },
+        { {4, 0}, {4, 1}, -1 },
+        { {4, 1}, {4, 3},  1 }, // Portal to Sector 1
+        { {4, 3}, {4, 4}, -1 },
+        { {4, 4}, {0, 4}, -1 },
+        { {0, 4}, {0, 0}, -1 },
         
-        // Sector 1 (Square)
-        { {4, 1}, {5, 1}, -1 },
-        { {5, 1}, {5, 2}, -1 },
-        { {5, 2}, {4, 2}, -1 },
-        { {4, 2}, {4, 1}, -1 }
+        // Sector 1
+        { {4, 1}, {6, 1}, -1 },
+        { {6, 1}, {6, 3}, -1 },
+        { {6, 3}, {4, 3}, -1 },
+        { {4, 3}, {4, 1},  0 }  // Portal to Sector 0
     };
     
-    Sector sectors[] = {
-        { 0.0f, 2.0f, 0, 3 }, // Floor 0, Ceil 2 // Triangle
-        { 0.5f, 2.5f, 3, 4 }  // Floor 0.5, Ceil 2.5 // Square
+    static Sector sectors[] = {
+        { 0.0f, 3.0f, 0, 6 }, // Sector 0: 6 walls starting at 0
+        { 0.5f, 2.5f, 6, 4 }  // Sector 1: 4 walls starting at 6
     };
     
     Map map = {
         .walls = walls,
-        .wall_count = 7,
+        .wall_count = 10,
         .sectors = sectors,
         .sector_count = 2
     };
     
     Camera cam = {
-        .pos = {0.0f, 1.5f, 1.0f}, // Start at 0, 1.5 (Centered Y), height 1
+        .pos = {2.0f, 2.0f, 1.5f}, // Start inside Sector 0
         .yaw = 0.0f
     };
 

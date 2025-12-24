@@ -33,4 +33,7 @@ typedef struct {
     u32     sector_count;
 } Map;
 
+// Find which sector contains the point (x,y)
+SectorID GetSectorAt(Map* map, Vec2 pos);
+
 #endif // BOOMER_WORLD_TYPES_H

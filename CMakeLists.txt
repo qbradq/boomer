@@ -49,7 +49,7 @@ if(NOT TARGET lua)
     endif()
 endif()
 
-add_executable(boomer src/main.c src/video/video.c src/render/renderer.c)
+add_executable(boomer src/main.c src/video/video.c src/render/renderer.c src/world/world.c)
 
 # Include directories
 target_include_directories(boomer PRIVATE 
