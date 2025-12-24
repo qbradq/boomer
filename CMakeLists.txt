@@ -57,7 +57,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(miniz)
 
-add_executable(boomer src/main.c src/video/video.c src/render/renderer.c src/world/world.c src/core/fs.c)
+add_executable(boomer src/main.c src/video/video.c src/render/renderer.c src/world/world.c src/core/fs.c src/core/lua_sys.c src/game/entity.c src/video/texture.c)
 
 # Include directories
 target_include_directories(boomer PRIVATE 

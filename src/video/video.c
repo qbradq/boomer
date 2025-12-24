@@ -1,4 +1,5 @@
 #include "video.h"
+#include "texture.h"
 #include <SDL.h>
 #include <stdio.h>
 
@@ -83,19 +84,65 @@ void Video_DrawLine(int x0, int y0, int x1, int y1, Color color) {
     }
 }
 
-void Video_DrawVertLine(int x, int y0, int y1, Color color) {
+void Video_DrawVertLine(int x, int y1, int y2, Color color) {
     if (x < 0 || x >= VIDEO_WIDTH) return;
-    if (y0 > y1) { int temp = y0; y0 = y1; y1 = temp; }
-    if (y0 < 0) y0 = 0;
-    if (y1 >= VIDEO_HEIGHT) y1 = VIDEO_HEIGHT - 1;
-    if (y0 > y1) return;
-
-    u32 pixel = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
-    u32* dest = &pixels[y0 * VIDEO_WIDTH + x];
-    // Simple loop is fast enough for software 320x200
-    for (int y = y0; y <= y1; ++y) {
-        *dest = pixel;
-        dest += VIDEO_WIDTH;
+    
+    if (y1 > y2) {
+        int temp = y1;
+        y1 = y2;
+        y2 = temp;
+    }
+    
+    if (y2 < 0 || y1 >= VIDEO_HEIGHT) return;
+    
+    if (y1 < 0) y1 = 0;
+    if (y2 >= VIDEO_HEIGHT) y2 = VIDEO_HEIGHT - 1;
+    
+    u32 c = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
+    
+    for (int y = y1; y <= y2; ++y) {
+        pixels[y * VIDEO_WIDTH + x] = c;
     }
 }
 
+void Video_DrawTexturedColumn(int x, int y_start, int y_end, Texture* tex, int tex_x, float v_start, float v_step) {
+    if (x < 0 || x >= VIDEO_WIDTH) return;
+    
+    int y1 = y_start;
+    int y2 = y_end;
+    
+    // Don't swap here, assume y_start is "top" and y_end is "bottom" in standard coords...
+    // But rendering goes from top to bottom on screen.
+    // If y1 > y2, it's inverted, but let's assume valid range.
+    if (y1 > y2) return; 
+
+    // Clip Top
+    if (y1 < 0) {
+        v_start += (-y1) * v_step; // Advance V
+        y1 = 0;
+    }
+    if (y1 >= VIDEO_HEIGHT) return;
+    
+    // Clip Bottom
+    if (y2 >= VIDEO_HEIGHT) y2 = VIDEO_HEIGHT - 1;
+    if (y2 < 0) return;
+    
+    float v = v_start;
+    u32 th = tex->height;
+    u32 tw = tex->width;
+    u32* tex_pixels = tex->pixels; // Renamed to avoid conflict with global 'pixels'
+    
+    // Wrap tex_x just in case
+    tex_x = tex_x % tw;
+    
+    for (int y = y1; y <= y2; ++y) {
+        // Sample
+        u32 tex_y = (u32)v % th;
+        u32 color = tex_pixels[tex_y * tw + tex_x];
+        
+        // Plot (Copy u32 directly)
+        pixels[y * VIDEO_WIDTH + x] = color; // Changed to global 'pixels'
+        
+        v += v_step;
+    }
+}

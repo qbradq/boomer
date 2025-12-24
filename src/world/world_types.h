@@ -11,6 +11,7 @@ typedef struct {
     Vec2 p1;            // Start vertex
     Vec2 p2;            // End vertex
     SectorID next_sector; // -1 if solid wall, otherwise ID of connected sector
+    i32 texture_id;     // -1 if none
     
     // Future: Texture IDs, UV scales, etc.
 } Wall;

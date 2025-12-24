@@ -8,10 +8,20 @@
 #include "core/types.h"
 #include "core/math_utils.h"
 #include "video/video.h"
+#include "video/texture.h"
 #include "render/renderer.h"
 #include "world/world_types.h"
 #include "core/fs.h"
 #include <stdio.h> // For logging FS test
+
+#include "core/lua_sys.h"
+#include "game/entity.h"
+
+typedef struct {
+    bool forward, backward, left, right;
+    bool turn_left, turn_right;
+    bool u, d;
+} InputState;
 
 int main(int argc, char** argv) {
     const char* asset_path = "games/demo";
@@ -32,37 +42,47 @@ int main(int argc, char** argv) {
             printf("FS TEST: Could not find 'test.txt'\n");
         }
     }
+    
+    // 0.5 Init Lua
+    if (!Lua_Init()) {
+        printf("CRITICAL: Failed to init Lua.\n");
+        return 1;
+    }
+    
+    // 0.6 Init Entity System
+    Entity_Init();
 
     // 1. Initialize Video
-    if (!Video_Init("Boomer Engine - Phase 3 Solid")) {
+    if (!Video_Init("Boomer Engine - Phase 4 Portals")) {
         return 1;
     }
     
     Renderer_Init();
+    Texture_Init();
+
+    // Load Textures
+    TextureID tex_wall = Texture_Load("textures/grid_blue.png");
 
     // 2. Setup Test World (2 Connected Sectors)
-    // Sector 0 (Big Room) - 6 Walls
-    // Sector 1 (Small Room) - 4 Walls
-    
-    static Wall walls[] = {
+    Wall walls[] = {
         // Sector 0
-        { {0, 0}, {4, 0}, -1 },
-        { {4, 0}, {4, 1}, -1 },
-        { {4, 1}, {4, 3},  1 }, // Portal to Sector 1
-        { {4, 3}, {4, 4}, -1 },
-        { {4, 4}, {0, 4}, -1 },
-        { {0, 4}, {0, 0}, -1 },
+        { {0, 0}, {4, 0}, -1, tex_wall },
+        { {4, 0}, {4, 1}, -1, tex_wall },
+        { {4, 1}, {4, 3},  1, -1 }, // Portal
+        { {4, 3}, {4, 4}, -1, tex_wall },
+        { {4, 4}, {0, 4}, -1, tex_wall },
+        { {0, 4}, {0, 0}, -1, tex_wall },
         
         // Sector 1
-        { {4, 1}, {6, 1}, -1 },
-        { {6, 1}, {6, 3}, -1 },
-        { {6, 3}, {4, 3}, -1 },
-        { {4, 3}, {4, 1},  0 }  // Portal to Sector 0
+        { {4, 1}, {6, 1}, -1, tex_wall },
+        { {6, 1}, {6, 3}, -1, tex_wall },
+        { {6, 3}, {4, 3}, -1, tex_wall },
+        { {4, 3}, {4, 1},  0, -1 }  // Portal
     };
     
-    static Sector sectors[] = {
-        { 0.0f, 3.0f, 0, 6 }, // Sector 0: 6 walls starting at 0
-        { 0.5f, 2.5f, 6, 4 }  // Sector 1: 4 walls starting at 6
+    Sector sectors[] = {
+        { 0.0f, 2.0f, 0, 6 }, // Sector 0
+        { 0.0f, 2.0f, 6, 4 }  // Sector 1
     };
     
     Map map = {
@@ -73,63 +93,81 @@ int main(int argc, char** argv) {
     };
     
     Camera cam = {
-        .pos = {2.0f, 2.0f, 1.5f}, // Start inside Sector 0
+        .pos = {2.0f, 2.0f, 0.75f}, // Start inside Sector 0
         .yaw = 0.0f
     };
+    
+    // Spawn Test Entity
+    printf("Spawning Test Entity...\n");
+    Entity_Spawn("scripts/test_ent.lua", (Vec3){3.0f, 3.0f, 1.0f});
 
     // 3. Game Loop
     bool running = true;
-    SDL_Event event;
-    const u8* keystate = SDL_GetKeyboardState(NULL);
+    InputState input = {0};
+    u32 last_time = SDL_GetTicks();
 
     while (running) {
         // Input Poll
+        SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
             }
-            if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    running = false;
-                }
-            }
+            // The original code had an SDLK_ESCAPE check here, but the new snippet removes it.
+            // If it's desired, it should be re-added. For now, following the snippet.
         }
         
-        // Input Continuous
-        f32 move_speed = 0.05f;
-        f32 rot_speed = 0.03f;
+        // Input Handling
+        const u8* keys = SDL_GetKeyboardState(NULL);
+        input.forward = keys[SDL_SCANCODE_W];
+        input.backward = keys[SDL_SCANCODE_S];
+        input.left = keys[SDL_SCANCODE_A]; // Strafe
+        input.right = keys[SDL_SCANCODE_D]; // Strafe
+        input.turn_left = keys[SDL_SCANCODE_LEFT];
+        input.turn_right = keys[SDL_SCANCODE_RIGHT];
+        input.u = keys[SDL_SCANCODE_Q];
+        input.d = keys[SDL_SCANCODE_E];
+
+        u32 current_time = SDL_GetTicks();
+        f32 dt = (current_time - last_time) / 1000.0f;
+        last_time = current_time;
         
-        if (keystate[SDL_SCANCODE_LEFT])  cam.yaw += rot_speed;
-        if (keystate[SDL_SCANCODE_RIGHT]) cam.yaw -= rot_speed;
+        // Camera Update
+        f32 move_speed = 3.0f * dt;
+        f32 rot_speed = 2.0f * dt;
         
-        // Move relative to Yaw
+        if (input.turn_left) cam.yaw += rot_speed; // PLUS for Left (Standard CCW)
+        if (input.turn_right) cam.yaw -= rot_speed; // MINUS for Right
+
         f32 cs = cosf(cam.yaw);
         f32 sn = sinf(cam.yaw);
         
-        // W/S Forward/Back
-        if (keystate[SDL_SCANCODE_W]) {
+        // Forward/Back
+        if (input.forward) {
             cam.pos.x += cs * move_speed;
             cam.pos.y += sn * move_speed;
         }
-        if (keystate[SDL_SCANCODE_S]) {
+        if (input.backward) {
             cam.pos.x -= cs * move_speed;
             cam.pos.y -= sn * move_speed;
         }
         
-        // A/D Strafe Left/Right
-        if (keystate[SDL_SCANCODE_A]) {
-            cam.pos.x -= sn * move_speed;
+        // Strafe
+        if (input.left) {
+            cam.pos.x -= sn * move_speed; // -sin, +cos for left vector (-90 deg)
             cam.pos.y += cs * move_speed;
         }
-        if (keystate[SDL_SCANCODE_D]) {
+        if (input.right) {
             cam.pos.x += sn * move_speed;
             cam.pos.y -= cs * move_speed;
         }
         
-        // Q/E Up/Down
-        if (keystate[SDL_SCANCODE_Q]) cam.pos.z += move_speed;
-        if (keystate[SDL_SCANCODE_E]) cam.pos.z -= move_speed;
+        // Fly
+        if (input.u) cam.pos.z += move_speed;
+        if (input.d) cam.pos.z -= move_speed;
 
+        // Entity Update
+        Entity_Update(dt);
 
         // Render
         Video_Clear((Color){20, 20, 30, 255}); // Dark blue background
@@ -137,9 +175,11 @@ int main(int argc, char** argv) {
         Render_Frame(cam, &map);
 
         Video_Present();
-        SDL_Delay(16); // ~60 FPS cap
     }
 
     Video_Shutdown();
+    Texture_Shutdown();
+    Lua_Shutdown();
+    FS_Shutdown();
     return 0;
 }
