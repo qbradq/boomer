@@ -23,6 +23,9 @@ typedef struct {
     WallID first_wall;  // Index into Map.walls
     u32 num_walls;      // Number of walls in this sector
     
+    i32 floor_tex_id; // -1 if none
+    i32 ceil_tex_id;  // -1 if none
+    
     // Future: Floor/Ceiling textures, light level
 } Sector;
 

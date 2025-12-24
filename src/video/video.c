@@ -3,10 +3,13 @@
 #include <SDL.h>
 #include <stdio.h>
 
-static SDL_Window*   window   = NULL;
+static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
-static SDL_Texture*  texture  = NULL;
-static u32           pixels[VIDEO_WIDTH * VIDEO_HEIGHT];
+static SDL_Texture* texture = NULL;
+
+// Exposed buffer
+static u32 frame_buffer[VIDEO_WIDTH * VIDEO_HEIGHT];
+u32* video_pixels = frame_buffer;
 
 bool Video_Init(const char* title) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -52,19 +55,19 @@ void Video_Shutdown(void) {
 }
 
 void Video_Clear(Color color) {
-    u32 pixel_val = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
+    u32 c = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
     for (int i = 0; i < VIDEO_WIDTH * VIDEO_HEIGHT; ++i) {
-        pixels[i] = pixel_val;
+        video_pixels[i] = c;
     }
 }
 
 void Video_PutPixel(int x, int y, Color color) {
     if (x < 0 || x >= VIDEO_WIDTH || y < 0 || y >= VIDEO_HEIGHT) return;
-    pixels[y * VIDEO_WIDTH + x] = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
+    video_pixels[y * VIDEO_WIDTH + x] = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
 }
 
 void Video_Present(void) {
-    SDL_UpdateTexture(texture, NULL, pixels, VIDEO_WIDTH * sizeof(u32));
+    SDL_UpdateTexture(texture, NULL, video_pixels, VIDEO_WIDTH * sizeof(u32));
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
@@ -101,7 +104,7 @@ void Video_DrawVertLine(int x, int y1, int y2, Color color) {
     u32 c = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
     
     for (int y = y1; y <= y2; ++y) {
-        pixels[y * VIDEO_WIDTH + x] = c;
+        video_pixels[y * VIDEO_WIDTH + x] = c;
     }
 }
 
@@ -141,7 +144,7 @@ void Video_DrawTexturedColumn(int x, int y_start, int y_end, Texture* tex, int t
         u32 color = tex_pixels[tex_y * tw + tex_x];
         
         // Plot (Copy u32 directly)
-        pixels[y * VIDEO_WIDTH + x] = color; // Changed to global 'pixels'
+        video_pixels[y * VIDEO_WIDTH + x] = color; // Changed to global 'pixels'
         
         v += v_step;
     }

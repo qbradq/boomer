@@ -11,6 +11,8 @@ typedef struct Texture Texture;
 #define VIDEO_HEIGHT 200
 #define VIDEO_SCALE  4
 
+extern u32* video_pixels;
+
 // Initialize the video system
 bool Video_Init(const char* title);
 

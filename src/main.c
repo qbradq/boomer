@@ -61,35 +61,48 @@ int main(int argc, char** argv) {
     Texture_Init();
 
     // Load Textures
-    TextureID tex_wall = Texture_Load("textures/grid_blue.png");
+    TextureID tex_wall = Texture_Load("textures/modern/inner_wall_1.png");
+    TextureID tex_floor = Texture_Load("textures/grid_blue.png");
+    TextureID tex_ceil = Texture_Load("textures/grid_blue.png");
 
-    // 2. Setup Test World (2 Connected Sectors)
+    // 2. Setup Test World (3 Connected Sectors)
+    // Sector 0 -> Portal to 1
+    // Sector 1 -> Portal to 0, Portal to 2
+    // Sector 2 -> Portal to 1
+    
     Wall walls[] = {
-        // Sector 0
+        // Sector 0 (0-5)
         { {0, 0}, {4, 0}, -1, tex_wall },
         { {4, 0}, {4, 1}, -1, tex_wall },
-        { {4, 1}, {4, 3},  1, -1 }, // Portal
+        { {4, 1}, {4, 3},  1, -1 }, // P->1
         { {4, 3}, {4, 4}, -1, tex_wall },
         { {4, 4}, {0, 4}, -1, tex_wall },
         { {0, 4}, {0, 0}, -1, tex_wall },
         
-        // Sector 1
-        { {4, 1}, {6, 1}, -1, tex_wall },
-        { {6, 1}, {6, 3}, -1, tex_wall },
-        { {6, 3}, {4, 3}, -1, tex_wall },
-        { {4, 3}, {4, 1},  0, -1 }  // Portal
+        // Sector 1 (6-11)
+        { {4, 1}, {8, 1}, -1, tex_wall }, // Top wall
+        { {8, 1}, {8, 3},  2, -1 }, // P->2 (East)
+        { {8, 3}, {4, 3}, -1, tex_wall }, // Bottom wall
+        { {4, 3}, {4, 1},  0, -1 }, // P->0 (West)
+        
+        // Sector 2 (10-13) - Let's make it a small room
+        { {8, 1}, {10, 1}, -1, tex_wall },
+        { {10, 1}, {10, 3}, -1, tex_wall },
+        { {10, 3}, {8, 3}, -1, tex_wall },
+        { {8, 3}, {8, 1},  1, -1 } // P->1
     };
     
     Sector sectors[] = {
-        { 0.0f, 2.0f, 0, 6 }, // Sector 0
-        { 0.0f, 2.0f, 6, 4 }  // Sector 1
+        { 0.0f, 2.0f, 0, 6, tex_floor, tex_ceil }, // S0
+        { 0.0f, 2.0f, 6, 4, tex_floor, tex_ceil }, // S1
+        { 0.5f, 2.5f, 10, 4, tex_floor, tex_ceil } // S2 (Higher floor)
     };
     
     Map map = {
         .walls = walls,
-        .wall_count = 10,
+        .wall_count = 14,
         .sectors = sectors,
-        .sector_count = 2
+        .sector_count = 3
     };
     
     Camera cam = {
