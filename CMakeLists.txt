@@ -28,30 +28,12 @@ FetchContent_MakeAvailable(stb)
 # QuickJS
 FetchContent_Declare(
   quickjs
-  GIT_REPOSITORY https://github.com/bellard/quickjs.git
+  GIT_REPOSITORY https://github.com/quickjs-ng/quickjs.git
   GIT_TAG        master
 )
 FetchContent_MakeAvailable(quickjs)
 
-if(NOT TARGET quickjs)
-  add_library(quickjs STATIC
-      ${quickjs_SOURCE_DIR}/quickjs.c
-      ${quickjs_SOURCE_DIR}/libregexp.c
-      ${quickjs_SOURCE_DIR}/libunicode.c
-      ${quickjs_SOURCE_DIR}/cutils.c
-      ${quickjs_SOURCE_DIR}/dtoa.c
-  )
-  target_include_directories(quickjs PUBLIC ${quickjs_SOURCE_DIR})
-  target_compile_definitions(quickjs PRIVATE 
-      CONFIG_VERSION="2021-03-27" 
-      _GNU_SOURCE
-  )
-  set_target_properties(quickjs PROPERTIES C_EXTENSIONS ON)
-  # QuickJS needs m on Linux
-  if(UNIX)
-      target_link_libraries(quickjs PRIVATE m)
-  endif()
-endif()
+
 
 # Fetch miniz (zip reader)
 FetchContent_Declare(
@@ -97,7 +79,7 @@ target_include_directories(boomer PRIVATE
 )
 
 # Link libraries
-target_link_libraries(boomer PRIVATE SDL2::SDL2 -lm quickjs miniz)
+target_link_libraries(boomer PRIVATE SDL2::SDL2 -lm qjs miniz)
 
 # Copy compile commands for tooling
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
