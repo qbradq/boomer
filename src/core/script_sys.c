@@ -27,6 +27,9 @@ bool Script_Init(void) {
         return false;
     }
     
+    // Increase stack limit for Web/WASM
+    JS_SetMaxStackSize(rt, 0);
+    
     ctx = JS_NewContext(rt);
     if (!ctx) {
         printf("QuickJS: Failed to create context.\n");

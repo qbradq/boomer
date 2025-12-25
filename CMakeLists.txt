@@ -33,8 +33,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(quickjs)
 
-
-
 # Fetch miniz (zip reader)
 FetchContent_Declare(
     miniz
@@ -88,7 +86,8 @@ if(EMSCRIPTEN)
         -sUSE_SDL_IMAGE=2 
         -sSDL2_IMAGE_FORMATS=["png"] 
         -sALLOW_MEMORY_GROWTH=1
-        "--preload-file" "${CMAKE_SOURCE_DIR}/games/demo@games/demo"
+        --shell-file "${CMAKE_SOURCE_DIR}/src/wasm_shell.html"
+        --preload-file "${CMAKE_SOURCE_DIR}/games/demo@games/demo"
     )
 endif()
 

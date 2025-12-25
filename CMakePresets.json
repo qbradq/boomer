@@ -48,7 +48,7 @@
       "displayName": "Web (Emscripten)",
       "description": "Build for the web using Emscripten.",
       "inherits": "release",
-      "toolchainFile": "$env{EMSCRIPTEN_ROOT}/cmake/Modules/Platform/Emscripten.cmake",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
       "cacheVariables": {
         "CMAKE_EXECUTABLE_SUFFIX": ".html"
       }

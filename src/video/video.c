@@ -110,12 +110,14 @@ void Video_BeginFrame(void) {
 
 void Video_DrawGame(SDL_Rect* dst_rect) {
     if (dst_rect) {
+        SDL_RenderSetViewport(renderer, NULL);
         SDL_RenderCopy(renderer, texture, NULL, dst_rect);
     } else {
         if (is_fullscreen) {
             // Integer Scaling Logic
             int w, h;
             SDL_GetWindowSize(window, &w, &h);
+            // printf("FS Size: %dx%d\n", w, h); // Debug: Check if size is plausible
             
             int scale_w = w / VIDEO_WIDTH;
             int scale_h = h / VIDEO_HEIGHT;
@@ -128,9 +130,11 @@ void Video_DrawGame(SDL_Rect* dst_rect) {
             dst.x = (w - dst.w) / 2;
             dst.y = (h - dst.h) / 2;
             
+            SDL_RenderSetViewport(renderer, NULL);
             SDL_RenderCopy(renderer, texture, NULL, &dst);
         } else {
             // Windowed - Fill Window
+            SDL_RenderSetViewport(renderer, NULL);
             SDL_RenderCopy(renderer, texture, NULL, NULL);
         }
     }
