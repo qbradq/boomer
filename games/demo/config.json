@@ -1,0 +1,14 @@
+{
+    "name": "demo",
+    "version": "0.0.0",
+    "description": "Demo game for the Boomer engine",
+    "author": "Norman B. Lancaster (qbradq)",
+    "license": "CC0-1.0",
+    "logical_resolution": [320, 180],
+    "window_size": 4,
+    "fullscreen": false,
+    "console_background": "gfx/console.png",
+    "console_text_color": "#FFFFFF",
+    "console_font": "fonts/PublicPixel.otf",
+    "console_font_size": 6
+}

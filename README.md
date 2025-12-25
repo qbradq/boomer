@@ -12,7 +12,7 @@ All requirements will be installed automatically by CMake.
 - CMake 3.14 or later
 - SDL2
 - stb
-- Lua 5.4
+- QuickJS
 - miniz
 - Nuklear
 

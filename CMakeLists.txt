@@ -25,29 +25,32 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(stb)
 
-# Lua 5.4
+# QuickJS
 FetchContent_Declare(
-  lua
-  GIT_REPOSITORY https://github.com/lua/lua.git
-  GIT_TAG        v5.4.6
+  quickjs
+  GIT_REPOSITORY https://github.com/bellard/quickjs.git
+  GIT_TAG        master
 )
-FetchContent_MakeAvailable(lua)
+FetchContent_MakeAvailable(quickjs)
 
-# Define Lua library manually since the repo doesn't use CMake
-if(NOT TARGET lua)
-    file(GLOB LUA_SOURCES "${lua_SOURCE_DIR}/*.c")
-    list(FILTER LUA_SOURCES EXCLUDE REGEX "lua\\.c$")
-    list(FILTER LUA_SOURCES EXCLUDE REGEX "luac\\.c$")
-    
-    add_library(lua STATIC ${LUA_SOURCES})
-    target_include_directories(lua PUBLIC "${lua_SOURCE_DIR}")
-    
-    if(UNIX AND NOT APPLE)
-        target_compile_definitions(lua PRIVATE LUA_USE_LINUX)
-        target_link_libraries(lua PRIVATE dl)
-    elseif(APPLE)
-        target_compile_definitions(lua PRIVATE LUA_USE_MACOSX)
-    endif()
+if(NOT TARGET quickjs)
+  add_library(quickjs STATIC
+      ${quickjs_SOURCE_DIR}/quickjs.c
+      ${quickjs_SOURCE_DIR}/libregexp.c
+      ${quickjs_SOURCE_DIR}/libunicode.c
+      ${quickjs_SOURCE_DIR}/cutils.c
+      ${quickjs_SOURCE_DIR}/dtoa.c
+  )
+  target_include_directories(quickjs PUBLIC ${quickjs_SOURCE_DIR})
+  target_compile_definitions(quickjs PRIVATE 
+      CONFIG_VERSION="2021-03-27" 
+      _GNU_SOURCE
+  )
+  set_target_properties(quickjs PROPERTIES C_EXTENSIONS ON)
+  # QuickJS needs m on Linux
+  if(UNIX)
+      target_link_libraries(quickjs PRIVATE m)
+  endif()
 endif()
 
 # Fetch miniz (zip reader)
@@ -77,7 +80,7 @@ add_executable(boomer
   src/render/renderer.c
   src/world/world.c
   src/core/fs.c
-  src/core/lua_sys.c
+  src/core/script_sys.c
   src/game/entity.c
   src/editor/editor.c
 )
@@ -87,14 +90,14 @@ target_include_directories(boomer PRIVATE
     src 
     ${SDL2_INCLUDE_DIRS} 
     ${stb_SOURCE_DIR}
-    ${lua_SOURCE_DIR}
+    ${quickjs_SOURCE_DIR}
     ${miniz_SOURCE_DIR}
     ${nuklear_SOURCE_DIR}
     ${nuklear_SOURCE_DIR}/demo/sdl_renderer
 )
 
 # Link libraries
-target_link_libraries(boomer PRIVATE SDL2::SDL2 -lm lua miniz)
+target_link_libraries(boomer PRIVATE SDL2::SDL2 -lm quickjs miniz)
 
 # Copy compile commands for tooling
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

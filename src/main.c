@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "SDL.h"
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
+
 
 #include "core/types.h"
 #include "core/math_utils.h"
@@ -12,7 +10,7 @@
 #include "render/renderer.h"
 #include "world/world_types.h"
 #include "core/fs.h"
-#include "core/lua_sys.h"
+#include "core/script_sys.h"
 #include "game/entity.h"
 #include "editor/editor.h"
 
@@ -35,9 +33,9 @@ int main(int argc, char** argv) {
         printf("FS Mounted: %s\n", asset_path);
     }
     
-    // 0.5 Init Lua
-    if (!Lua_Init()) {
-        printf("CRITICAL: Failed to init Lua.\n");
+    // 0.5 Init Script System
+    if (!Script_Init()) {
+        printf("CRITICAL: Failed to init Script System.\n");
         return 1;
     }
     
@@ -104,7 +102,7 @@ int main(int argc, char** argv) {
     
     // Spawn Test Entity
     printf("Spawning Test Entity...\n");
-    Entity_Spawn("scripts/test_ent.lua", (Vec3){3.0f, 3.0f, 1.0f});
+    Entity_Spawn("scripts/test_ent.js", (Vec3){3.0f, 3.0f, 1.0f});
 
     // 3. Game Loop
     bool running = true;
@@ -246,7 +244,8 @@ int main(int argc, char** argv) {
     Editor_Shutdown();
     Video_Shutdown();
     Texture_Shutdown();
-    Lua_Shutdown();
+    Entity_Shutdown();
+    Script_Shutdown();
     FS_Shutdown();
     return 0;
 }

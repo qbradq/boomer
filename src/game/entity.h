@@ -3,6 +3,8 @@
 
 #include "../core/types.h"
 
+#include "../core/script_sys.h"
+
 // Simple ECS-ish entity
 typedef struct {
     u32 id;
@@ -13,10 +15,11 @@ typedef struct {
     f32 yaw;
     
     // Scripting
-    int lua_ref; // Reference to the Instance Table in Lua Registry
+    JSValue instance_js; // Reference to the Instance Object
 } Entity;
 
 void Entity_Init(void);
+void Entity_Shutdown(void);
 void Entity_Update(f32 dt);
 
 // Spawns an entity using a script.

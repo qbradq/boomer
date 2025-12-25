@@ -21,25 +21,24 @@ style) as a fun and expressive platform for making and sharing games.
 - **Engine Style**: 2.5D (Sector-based, similar to Doom/Build)
 - **Philosophy**: Fun and expressive platform.
 
-## World Representation (TBD)
+## World Representation
 - **Structure**: Portal-Sector (Build-like) world representation.
 - **Verticality**: Room-over-room (ROR) support via portals.
 
-## Coordinate System (TBD)
+## Coordinate System
 - **Units**: 1 unit equals 64 pixels.
 - **axes**: The positive Z axis points up.
 - **Math**: Floating point, 32-bit precision.
 
-## Rendering (TBD)
+## Rendering
 - **Technique**: Software column/span drawing. Direct pixel access.
 - **Perspective**: 2.5D (Projected).
 
-## Entities & Logic (TBD)
+## Entities & Logic
 - **Representation**: Entity Component System (ECS).
-- **Scripting**: Lua 5.4.
+- **Scripting**: QuickJS.
 
-## Resource Management (TBD)
+## Resource Management
 - **Format**: Standard .zip file archive for distribution, directory on disk for
   development.
 - **Loading**: Lazy loading.
-
