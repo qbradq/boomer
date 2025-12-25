@@ -88,6 +88,7 @@ if(EMSCRIPTEN)
         -sALLOW_MEMORY_GROWTH=1
         --shell-file "${CMAKE_SOURCE_DIR}/src/wasm_shell.html"
         --preload-file "${CMAKE_SOURCE_DIR}/games/demo@games/demo"
+        -lidbfs.js
     )
 endif()
 

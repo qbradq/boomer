@@ -227,6 +227,13 @@ int main(int argc, char** argv) {
         printf("FS Mounted: %s\n", asset_path);
     }
     
+    // 0.1 Init User Data
+    #ifdef __EMSCRIPTEN__
+    FS_InitUserData("/data");
+    #else
+    FS_InitUserData("data");
+    #endif
+    
     // 0.5 Init Script System
     if (!Script_Init()) {
         printf("CRITICAL: Failed to init Script System.\n");

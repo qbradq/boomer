@@ -19,4 +19,9 @@ void* FS_ReadFile(const char* path, size_t* out_size);
 // Free file memory
 void FS_FreeFile(void* data);
 
+// User Data Persistence
+bool FS_InitUserData(const char* mount_point);
+bool FS_WriteUserData(const char* filename, const void* data, size_t size);
+void* FS_ReadUserData(const char* filename, size_t* out_size);
+
 #endif // BOOMER_FS_H
