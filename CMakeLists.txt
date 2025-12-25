@@ -4,7 +4,7 @@ project(boomer C)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_C_FORMAT_CHECK clang-format-20)
 
 include(FetchContent)
@@ -80,6 +80,17 @@ target_include_directories(boomer PRIVATE
 
 # Link libraries
 target_link_libraries(boomer PRIVATE SDL2::SDL2 -lm qjs miniz)
+
+if(EMSCRIPTEN)
+    set_target_properties(boomer PROPERTIES SUFFIX ".html")
+    target_link_options(boomer PRIVATE 
+        -sUSE_SDL=2 
+        -sUSE_SDL_IMAGE=2 
+        -sSDL2_IMAGE_FORMATS=["png"] 
+        -sALLOW_MEMORY_GROWTH=1
+        "--preload-file" "${CMAKE_SOURCE_DIR}/games/demo@games/demo"
+    )
+endif()
 
 # Copy compile commands for tooling
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

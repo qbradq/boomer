@@ -9,12 +9,14 @@ games to the web and desktop.
 
 All requirements will be installed automatically by CMake.
 
-- CMake 3.14 or later
+- CMake 3.19 or later
+- Emscripten 4.0.22 or later
 - SDL2
 - stb
 - QuickJS
 - miniz
 - Nuklear
+- Ninja build tools
 
 ### Build
 

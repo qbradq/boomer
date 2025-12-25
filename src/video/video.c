@@ -38,6 +38,8 @@ bool Video_Init(const char* title) {
         printf("Renderer Create Failed: %s\n", SDL_GetError());
         return false;
     }
+    
+    SDL_RenderSetVSync(renderer, 1);
 
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, VIDEO_WIDTH, VIDEO_HEIGHT);
     if (!texture) {

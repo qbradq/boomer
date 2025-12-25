@@ -42,6 +42,16 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "web",
+      "displayName": "Web (Emscripten)",
+      "description": "Build for the web using Emscripten.",
+      "inherits": "release",
+      "toolchainFile": "$env{EMSCRIPTEN_ROOT}/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": {
+        "CMAKE_EXECUTABLE_SUFFIX": ".html"
+      }
     }
   ],
   "buildPresets": [
@@ -56,6 +66,10 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "web",
+      "configurePreset": "web"
     }
   ]
 }
