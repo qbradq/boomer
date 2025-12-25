@@ -294,8 +294,9 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
                 }
                 
                 // Update Window for Recursion
-                wy_top = max(ny_ceil, cy_top);
-                wy_bot = min(ny_floor, cy_bot);
+                // Clip against Current Sector Ceiling/Floor as well
+                wy_top = max(ny_ceil, max(y_ceil, cy_top));
+                wy_bot = min(ny_floor, min(y_floor, cy_bot));
                 
             } else {
                 // Not a portal - Draw Solid Wall
