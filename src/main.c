@@ -12,6 +12,7 @@
 #include "video/texture.h"
 #include "render/renderer.h"
 #include "world/world_types.h"
+#include "world/map_loader.h"
 #include "core/fs.h"
 #include "core/script_sys.h"
 #include "game/entity.h"
@@ -244,7 +245,7 @@ int main(int argc, char** argv) {
     Entity_Init();
 
     // 1. Initialize Video
-    if (!Video_Init("Boomer Engine - Phase 11 Editor")) {
+    if (!Video_Init("Boomer Engine")) {
         return 1;
     }
     
@@ -254,37 +255,13 @@ int main(int argc, char** argv) {
     Renderer_Init();
     Texture_Init();
 
-    // Load Textures
-    tex_wall = Texture_Load("textures/modern/inner_wall_1.png");
-    tex_floor = Texture_Load("textures/grid_blue.png");
-    tex_ceil = Texture_Load("textures/grid_blue.png");
-    tex_wood = Texture_Load("textures/modern/wood_0.png");
+    // 2. Load Map
+    if( !Map_Load("test.json", &map) ) {
+        printf("FAILED TO LOAD MAP!\n");
+    }
 
-    // Init World Texture IDs
-    walls[0].texture_id = tex_wall;
-    walls[1].texture_id = tex_wall;
-    walls[2].top_texture_id = tex_wood; walls[2].bottom_texture_id = tex_wood;
-    walls[3].texture_id = tex_wall;
-    walls[4].texture_id = tex_wall;
-    walls[5].texture_id = tex_wall;
-    
-    walls[6].texture_id = tex_wall;
-    walls[7].top_texture_id = tex_wood; walls[7].bottom_texture_id = tex_wood;
-    walls[8].texture_id = tex_wall;
-    walls[9].top_texture_id = tex_wood; walls[9].bottom_texture_id = tex_wood;
-    
-    walls[10].texture_id = tex_wall;
-    walls[11].texture_id = tex_wall;
-    walls[12].texture_id = tex_wall;
-    walls[13].top_texture_id = tex_wood; walls[13].bottom_texture_id = tex_wood;
-
-    sectors[0].floor_tex_id = tex_floor; sectors[0].ceil_tex_id = tex_ceil;
-    sectors[1].floor_tex_id = tex_floor; sectors[1].ceil_tex_id = tex_ceil;
-    sectors[2].floor_tex_id = tex_floor; sectors[2].ceil_tex_id = tex_ceil;
-
-    // Spawn Test Entity
-    printf("Spawning Test Entity...\n");
-    Entity_Spawn("scripts/test_ent.js", (Vec3){3.0f, 3.0f, 1.0f});
+    // 4. Init Camera
+    cam.pos = (Vec3){2.0f, 2.0f, 1.5f};
 
     // 3. Game Loop
     last_time = SDL_GetTicks();

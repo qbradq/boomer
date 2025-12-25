@@ -59,6 +59,7 @@ add_executable(boomer
   src/video/texture.c
   src/render/renderer.c
   src/world/world.c
+  src/world/map_loader.c
   src/core/fs.c
   src/core/script_sys.c
   src/game/entity.c

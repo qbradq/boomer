@@ -1,0 +1,33 @@
+{
+  "textures": [
+    { "id": 0, "path": "modern/inner_wall_1.png" },
+    { "id": 1, "path": "grid_blue.png" },
+    { "id": 2, "path": "modern/wood_0.png" }
+  ],
+  "sectors": [
+    {
+      "floor_height": 0.0,
+      "ceil_height": 3.0,
+      "floor_tex": 1,
+      "ceil_tex": 1,
+      "walls": [
+         { "p1": [0, 0], "p2": [10, 0], "tex": 0, "portal": -1 },
+         { "p1": [10, 0], "p2": [10, 10], "tex": 2, "portal": 1 },
+         { "p1": [10, 10], "p2": [0, 10], "tex": 0, "portal": -1 },
+         { "p1": [0, 10], "p2": [0, 0], "tex": 0, "portal": -1 } 
+      ]
+    },
+    {
+       "floor_height": 0.5, "ceil_height": 4.0, "floor_tex": 1, "ceil_tex": 1,
+       "walls": [
+         { "p1": [10, 10], "p2": [10, 0], "tex": 2, "portal": 0 },
+         { "p1": [10, 0], "p2": [20, 0], "tex": 0, "portal": -1 },
+         { "p1": [20, 0], "p2": [20, 10], "tex": 0, "portal": -1 },
+         { "p1": [20, 10], "p2": [10, 10], "tex": 0, "portal": -1 }
+       ]
+    }
+  ],
+  "entities": [
+    { "script": "scripts/test_ent.js", "pos": [5, 5, 1] }
+  ]
+}
