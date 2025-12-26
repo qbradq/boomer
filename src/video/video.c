@@ -102,27 +102,18 @@ void Video_ChangeScale(int delta) {
 }
 
 void Video_ToggleFullscreen(void) {
+    ToggleBorderlessWindowed();
+    is_fullscreen = !is_fullscreen;
+
     if (!is_fullscreen) {
-        int monitor = GetCurrentMonitor();
-        int w = GetMonitorWidth(monitor);
-        int h = GetMonitorHeight(monitor);
-        
-        SetWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
-        SetWindowSize(w, h);
-        is_fullscreen = true;
-    } else {
-        ClearWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
-        
         int w = VIDEO_WIDTH * current_scale;
         int h = VIDEO_HEIGHT * current_scale;
         SetWindowSize(w, h);
-        
+
         int monitor = GetCurrentMonitor();
         int mx = GetMonitorWidth(monitor);
         int my = GetMonitorHeight(monitor);
-        SetWindowPosition((mx - w)/2, (my - h)/2);
-        
-        is_fullscreen = false;
+        SetWindowPosition((mx - w) / 2, (my - h) / 2);
     }
 }
 
