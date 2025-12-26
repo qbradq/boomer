@@ -40,11 +40,7 @@ bool Video_Init(const char* title) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     
     if (is_fullscreen) {
-        // We start in windowed then toggle? Or flag?
-        // Raylib SetConfigFlags(FLAG_FULLSCREEN_MODE) works before InitWindow
-        // But we want "borderless fullscreen windowed" usually, or just ToggleFullscreen after.
-        // Let's stick to ToggleFullscreen after init if needed, or SetConfigFlags.
-        SetConfigFlags(FLAG_FULLSCREEN_MODE); // exclusive fullscreen
+        SetConfigFlags(FLAG_BORDERLESS_WINDOWED_MODE);
     }
 
     int width = VIDEO_WIDTH * current_scale;
@@ -57,7 +53,13 @@ bool Video_Init(const char* title) {
         printf("Video: Raylib InitWindow failed.\n");
         return false;
     }
-
+    
+    if (is_fullscreen) {
+        int monitor = GetCurrentMonitor();
+        int mw = GetMonitorWidth(monitor);
+        int mh = GetMonitorHeight(monitor);
+        SetWindowSize(mw, mh);
+    }
 
     // Raylib LoadTextureFromImage requires an Image.
     // We'll create a blank image first or just create texture entirely?
@@ -80,7 +82,7 @@ void Video_Shutdown(void) {
 }
 
 void Video_ChangeScale(int delta) {
-    if (IsWindowFullscreen()) return;
+    if (is_fullscreen) return;
 
     current_scale += delta;
     if (current_scale < 1) current_scale = 1;
@@ -90,8 +92,7 @@ void Video_ChangeScale(int delta) {
     int h = VIDEO_HEIGHT * current_scale;
     
     SetWindowSize(w, h);
-    // Center window logic is a bit manual in Raylib or we assume OS handles it.
-    // Raylib doesn't have explicit "Center Window" command easily exposed without getting monitor info.
+    
     int monitor = GetCurrentMonitor();
     int mx = GetMonitorWidth(monitor);
     int my = GetMonitorHeight(monitor);
@@ -101,8 +102,28 @@ void Video_ChangeScale(int delta) {
 }
 
 void Video_ToggleFullscreen(void) {
-    ToggleFullscreen(); // Raylib handles this
-    is_fullscreen = IsWindowFullscreen();
+    if (!is_fullscreen) {
+        int monitor = GetCurrentMonitor();
+        int w = GetMonitorWidth(monitor);
+        int h = GetMonitorHeight(monitor);
+        
+        SetWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
+        SetWindowSize(w, h);
+        is_fullscreen = true;
+    } else {
+        ClearWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
+        
+        int w = VIDEO_WIDTH * current_scale;
+        int h = VIDEO_HEIGHT * current_scale;
+        SetWindowSize(w, h);
+        
+        int monitor = GetCurrentMonitor();
+        int mx = GetMonitorWidth(monitor);
+        int my = GetMonitorHeight(monitor);
+        SetWindowPosition((mx - w)/2, (my - h)/2);
+        
+        is_fullscreen = false;
+    }
 }
 
 void Video_Clear(Color color) {
@@ -112,17 +133,15 @@ void Video_Clear(Color color) {
     }
 }
 
+
 void Video_PutPixel(int x, int y, Color color) {
     if (x < 0 || x >= VIDEO_WIDTH || y < 0 || y >= VIDEO_HEIGHT) return;
     video_pixels[y * VIDEO_WIDTH + x] = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
 }
 
 void Video_BeginFrame(void) {
-    // Prepare for drawing
-    // In our case, we might update texture here?
-    // Raylib's BeginDrawing() clears screen usually.
     BeginDrawing();
-    ClearBackground(BLACK); // Clear "back" of window
+    ClearBackground(BLACK); 
 }
 
 void Video_DrawGame(const Rectangle* dst_rect) {

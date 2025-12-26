@@ -125,7 +125,8 @@ void Loop(void) {
 
     // Global Toggles
     if (IsKeyPressed(KEY_F12)) {
-        Editor_Toggle();
+        // Removed or keep F12 for Editor? Prompt said change it.
+        // I will remove it and use F2 below.
     }
     
     // Pass to Editor
@@ -148,7 +149,12 @@ void Loop(void) {
     if (IsKeyPressed(KEY_F10)) {
         Video_ToggleFullscreen();
     }
-    
+
+    if (IsKeyPressed(KEY_F2)) {
+        Editor_Toggle();
+    }
+
+
     // Game Input Handling
     if (!Editor_IsActive() && !Console_IsActive()) {
         input.forward = Config_IsActionDown("move_forward");
