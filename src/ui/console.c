@@ -170,8 +170,19 @@ void Console_Draw(void) {
     
     // Draw the render texture to the screen
     // We can draw it effectively as an overlay.
-    // Flip Y because of OpenGL coordinates in RenderTexture
-    DrawTextureRec(console.target.texture, (Rectangle){0, 0, (float)CONSOLE_WIDTH, (float)-CONSOLE_HEIGHT}, (Vector2){0, 0}, WHITE);
+    // Fit to current screen size. Since texture is fixed resolution, we scale it.
+    
+    float sw = (float)GetScreenWidth();
+    float sh = (float)GetScreenHeight();
+    
+    // DrawTexturePro(texture, source, dest, origin, rotation, tint)
+    // Source: 0, 0, width, -height (flipped)
+    // Dest: 0, 0, sw, sh
+    
+    DrawTexturePro(console.target.texture, 
+        (Rectangle){0, 0, (float)CONSOLE_WIDTH, (float)-CONSOLE_HEIGHT}, 
+        (Rectangle){0, 0, sw, sh}, 
+        (Vector2){0, 0}, 0.0f, WHITE);
 }
 
 bool Console_IsActive(void) {

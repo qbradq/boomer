@@ -44,8 +44,10 @@ add_executable(boomer
   src/world/map_loader.c
   src/core/fs.c
   src/core/script_sys.c
+  src/core/config.c
   src/game/entity.c
   src/editor/editor.c
+  src/ui/console.c
 )
 
 # Include directories

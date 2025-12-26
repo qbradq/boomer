@@ -5,10 +5,10 @@
     "author": "Norman B. Lancaster (qbradq)",
     "license": "CC0-1.0",
     "logical_resolution": [320, 180],
-    "console_background": "gfx/console.png",
+    "console_background": "#1A1932",
     "console_text_color": "#FFFFFF",
-    "console_font": "fonts/PublicPixel.otf",
-    "console_font_size": 6,
+    "console_font": "fonts/Unitblock.ttf",
+    "console_font_size": 8,
     "window_size": 4,
     "fullscreen": false
 }

@@ -202,8 +202,9 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
         f32 uz2 = u2 * iz2;
         
         // Preparing next recursion buffers if portal
-        i16 next_y_top[VIDEO_WIDTH];
-        i16 next_y_bot[VIDEO_WIDTH];
+        // Preparing next recursion buffers if portal
+        i16 next_y_top[MAX_VIDEO_WIDTH];
+        i16 next_y_bot[MAX_VIDEO_WIDTH];
         bool portal = (wall->next_sector != -1);
         
         // 6. Draw Columns
@@ -348,8 +349,9 @@ void Render_Frame(GameCamera cam, Map* map) {
     Video_Clear((Color){20, 20, 30, 255});
     
     // Init Clipping Buffers
-    i16 y_top[VIDEO_WIDTH];
-    i16 y_bot[VIDEO_WIDTH];
+    // Init Clipping Buffers
+    i16 y_top[MAX_VIDEO_WIDTH];
+    i16 y_bot[MAX_VIDEO_WIDTH];
     for(int i=0; i<VIDEO_WIDTH; ++i) {
         y_top[i] = 0;
         y_bot[i] = VIDEO_HEIGHT - 1;

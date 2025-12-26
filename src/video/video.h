@@ -8,9 +8,12 @@ struct Texture; // Forward declaration
 struct GameTexture;
 
 // Video configuration
-#define VIDEO_WIDTH  320
-#define VIDEO_HEIGHT 180
-#define VIDEO_SCALE  4
+// Video configuration
+extern int VIDEO_WIDTH;
+extern int VIDEO_HEIGHT;
+#define MAX_VIDEO_WIDTH 1280
+#define MAX_VIDEO_HEIGHT 720
+
 
 extern u32* video_pixels;
 

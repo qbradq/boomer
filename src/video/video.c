@@ -5,8 +5,12 @@
 #include <stdlib.h> // abs
 
 // Exposed buffer
-static u32 frame_buffer[VIDEO_WIDTH * VIDEO_HEIGHT];
-u32* video_pixels = frame_buffer;
+static u32* frame_buffer = NULL;
+u32* video_pixels = NULL;
+
+int VIDEO_WIDTH = 320;
+int VIDEO_HEIGHT = 180;
+
 
 static int current_scale = 4;
 static bool is_fullscreen = false;
@@ -15,13 +19,34 @@ static bool is_fullscreen = false;
 static Texture2D screen_texture;
 static bool texture_ready = false;
 
+#include "../core/config.h"
+
 bool Video_Init(const char* title) {
+    // Load Config
+    const GameConfig* cfg = Config_Get();
+    VIDEO_WIDTH = cfg->logical_width;
+    VIDEO_HEIGHT = cfg->logical_height;
+    current_scale = cfg->window_scale;
+    is_fullscreen = cfg->fullscreen;
+
+    // Allocate framebuffer
+    frame_buffer = malloc(VIDEO_WIDTH * VIDEO_HEIGHT * sizeof(u32));
+    video_pixels = frame_buffer;
+
     // Raylib Init
     SetTraceLogLevel(LOG_WARNING); // Reduce noise
     
     // We want the window to be scalable
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     
+    if (is_fullscreen) {
+        // We start in windowed then toggle? Or flag?
+        // Raylib SetConfigFlags(FLAG_FULLSCREEN_MODE) works before InitWindow
+        // But we want "borderless fullscreen windowed" usually, or just ToggleFullscreen after.
+        // Let's stick to ToggleFullscreen after init if needed, or SetConfigFlags.
+        SetConfigFlags(FLAG_FULLSCREEN_MODE); // exclusive fullscreen
+    }
+
     int width = VIDEO_WIDTH * current_scale;
     int height = VIDEO_HEIGHT * current_scale;
     
@@ -50,6 +75,7 @@ bool Video_Init(const char* title) {
 void Video_Shutdown(void) {
     if (texture_ready) UnloadTexture(screen_texture);
     CloseWindow();
+    if (frame_buffer) free(frame_buffer);
 }
 
 void Video_ChangeScale(int delta) {

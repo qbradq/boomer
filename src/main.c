@@ -14,8 +14,33 @@
 #include "world/map_loader.h"
 #include "core/fs.h"
 #include "core/script_sys.h"
+#include "core/config.h"      // Added
 #include "game/entity.h"
 #include "editor/editor.h"
+#include "ui/console.h"       // Added
+
+// JS Binding for Map Loading
+static JSValue js_load_map(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    if (argc < 1) return JS_EXCEPTION;
+    const char* filename = JS_ToCString(ctx, argv[0]);
+    if (!filename) return JS_EXCEPTION;
+    
+    printf("JS Request: Load Map '%s'\n", filename);
+    
+    // We need access to the global 'map' variable.
+    // Since 'map' is static in main.c, we can access it if we put this function in main.c
+    // But we need to forward declare 'map' or move this function after map definition.
+    // map is defined below. We'll move this function or use a forward declaration or helper.
+    // Let's implement a wrapper `Game_LoadMap` in main? 
+    // Or just putting `map` at top scope is cleaner.
+    // For now, I will use a forward decl of the helper and implement it after `map` is defined.
+    // But this is inside main.c
+    
+    // Actually, I can just put this binding function AFTER `map` definition.
+    // See below chunks.
+    return JS_UNDEFINED;
+}
+
 
 typedef struct {
     bool forward, backward, left, right;
@@ -74,6 +99,28 @@ static GameCamera cam = {
     .yaw = 0.0f
 };
 
+// Moved binding here to access 'map'
+static JSValue js_load_map_wrapper(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    if (argc < 1) return JS_EXCEPTION;
+    const char* filename = JS_ToCString(ctx, argv[0]);
+    if (!filename) return JS_EXCEPTION;
+    
+    bool res = Map_Load(filename, &map);
+    
+    if (res) {
+        Console_SetMapLoaded(true);
+        // Reset camera if needed? Or controlled by script?
+        // For now, let's just say success.
+        printf("Map Loaded via script.\n");
+    } else {
+        printf("Failed to load map '%s' via script.\n", filename);
+    }
+    
+    JS_FreeCString(ctx, filename);
+    return JS_NewBool(ctx, res);
+}
+
+
 // --- Loop Function ---
 void Loop(void) {
     if (!running || WindowShouldClose()) {
@@ -85,6 +132,19 @@ void Loop(void) {
     }
 
     // Input Poll - Handled by Raylib
+    
+    // Console Input
+    if (Console_HandleEvent()) {
+        // If console consumed event (e.g. toggle), we might want to skip other inputs?
+        // But Console_HandleEvent currently only handles Toggle.
+        // If console is Full/Half, maybe block game input?
+        if (Console_IsActive()) {
+             // Block Game Input
+             // But we still process F-keys?
+             // Let's allow F-keys for now.
+        }
+    }
+
 
     // Global Toggles
     if (IsKeyPressed(KEY_F12)) {
@@ -116,7 +176,8 @@ void Loop(void) {
     }
     
     // Game Input Handling
-    if (!Editor_IsActive()) {
+    if (!Editor_IsActive() && !Console_IsActive()) {
+
         input.forward = IsKeyDown(KEY_W);
         input.backward = IsKeyDown(KEY_S);
         input.left = IsKeyDown(KEY_A); 
@@ -166,23 +227,19 @@ void Loop(void) {
     Video_BeginFrame();
     
     if (Editor_IsActive()) {
-        // Update Editor Logic (Selection)
+        // ... (Editor rendering kept same)
         Editor_Update(&map, &cam);
-        
-        // EDITOR MODE
         int view = Editor_GetViewMode();
         if (view == 0) {
-            // 3D View (in a window? For now fill screen behind UI)
             Render_Frame(cam, &map);
-            Video_DrawGame(NULL); // Fill
+            Video_DrawGame(NULL); 
         } else {
-            // 2D View
-            int w = GetScreenWidth();
-            int h = GetScreenHeight();
-            Render_Map2D(&map, cam, 0, 0, w, h, 32.0f, Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex()); 
+             int w = GetScreenWidth();
+             int h = GetScreenHeight();
+             Render_Map2D(&map, cam, 0, 0, w, h, 32.0f, 
+                Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), 
+                Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex()); 
         }
-        
-        // Draw UI
         Editor_Render(&map, &cam);
         
     } else {
@@ -191,9 +248,14 @@ void Loop(void) {
         Render_Frame(cam, &map);
         Video_DrawGame(NULL);
     }
+    
+    // Draw Console (Overlay)
+    Console_Update(dt);
+    Console_Draw();
 
     Video_EndFrame();
 }
+
 
 int main(int argc, char** argv) {
     const char* asset_path = "games/demo";
@@ -215,11 +277,15 @@ int main(int argc, char** argv) {
     FS_InitUserData("data");
     #endif
     
+    // 0.2 Load Config
+    Config_Load();
+
     // 0.5 Init Script System
     if (!Script_Init()) {
         printf("CRITICAL: Failed to init Script System.\n");
         return 1;
     }
+    Script_RegisterFunc("loadMap", js_load_map_wrapper, 1);
     
     // 0.6 Init Entity System
     Entity_Init();
@@ -229,16 +295,21 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+    // Init Console (After Video)
+    Console_Init();
+    
     // Init Editor
     Editor_Init();
     
     Renderer_Init();
     Texture_Init();
 
-    // 2. Load Map
-    if( !Map_Load("test.json", &map) ) {
-        printf("FAILED TO LOAD MAP!\n");
-    }
+    // 2. Load Map (Via Script now)
+    // if( !Map_Load("test.json", &map) ) ... REMOVED hardcoded load
+
+    // 2.5 Run Main Script
+    JSValue mainScriptVal = Script_EvalFile("scripts/main.js");
+    JS_FreeValue(Script_GetContext(), mainScriptVal);
 
     // 4. Init Camera
     cam.pos = (Vec3){2.0f, 2.0f, 1.5f};
@@ -252,6 +323,7 @@ int main(int argc, char** argv) {
         Loop();
     }
     
+    Console_Shutdown();
     Editor_Shutdown();
     Video_Shutdown();
     Texture_Shutdown();
@@ -259,6 +331,7 @@ int main(int argc, char** argv) {
     Script_Shutdown();
     FS_Shutdown();
 #endif
+
 
     return 0;
 }

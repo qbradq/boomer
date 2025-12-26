@@ -18,7 +18,7 @@ static GameConfig g_config = {
 };
 
 static u32 ParseColor(const char* hex_str) {
-    if (!hex_str || hex_str[0] != '#') return 0xFFFFFFFF;
+    if (!hex_str || hex_str[0] != '#') return 0; // Return 0 (Transparent) if not a color code
     
     // #RRGGBB or #RRGGBBAA
     unsigned int r, g, b, a = 255;
@@ -40,7 +40,13 @@ static u32 ParseColor(const char* hex_str) {
 
 static void LoadConfigObj(JSContext* ctx, JSValue obj) {
     JSValue res = JS_GetPropertyStr(ctx, obj, "logical_resolution");
-    if (JS_IsArray(ctx, res)) {
+    // The original line below had a syntax error and was redundant with the next 'if'.
+    // The comment indicated JS_IsArray should only take one argument.
+    // if (JS_IsArray(ctx, res) == 1 || JS_IsArray(ctx, res) == true) { // Wait, JS_IsArray returns int (bool)
+    //    // Error said: too many arguments. JS_IsArray(val).
+    //    // Also it returns int (0/1).
+    //    // So:
+    if (JS_IsArray(res)) {
         JSValue w = JS_GetPropertyUint32(ctx, res, 0);
         JSValue h = JS_GetPropertyUint32(ctx, res, 1);
         int iw, ih;
@@ -68,7 +74,8 @@ static void LoadConfigObj(JSContext* ctx, JSValue obj) {
     JSValue bg = JS_GetPropertyStr(ctx, obj, "console_background");
     if (JS_IsString(bg)) {
         const char* s = JS_ToCString(ctx, bg);
-        g_config.console_bg_color = ParseColor(s);
+        u32 col = ParseColor(s);
+        if (col != 0) g_config.console_bg_color = col;
         JS_FreeCString(ctx, s);
     }
     JS_FreeValue(ctx, bg);
