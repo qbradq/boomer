@@ -4,10 +4,16 @@
 #include "types.h"
 #include <math.h>
 
+#ifndef PI
 #define PI 3.14159265359f
+#endif
 #define TAU 6.28318530718f
+#ifndef DEG2RAD
 #define DEG2RAD(d) ((d) * (PI / 180.0f))
+#endif
+#ifndef RAD2DEG
 #define RAD2DEG(r) ((r) * (180.0f / PI))
+#endif
 
 // Vec2 Operations
 static inline Vec2 vec2_add(Vec2 a, Vec2 b) { return (Vec2){a.x + b.x, a.y + b.y}; }

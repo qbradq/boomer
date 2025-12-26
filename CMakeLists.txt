@@ -6,24 +6,18 @@ set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_C_FORMAT_CHECK clang-format-20)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+configure_file(.clangd.in ${CMAKE_SOURCE_DIR}/.clangd @ONLY)
 
 include(FetchContent)
 
-# SDL2
+# Raylib 5.5
 FetchContent_Declare(
-  SDL2
-  GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-  GIT_TAG        release-2.30.0 # Pinning to a recent stable release
+  raylib
+  GIT_REPOSITORY https://github.com/raysan5/raylib.git
+  GIT_TAG        5.5
 )
-FetchContent_MakeAvailable(SDL2)
-
-# stb
-FetchContent_Declare(
-  stb
-  GIT_REPOSITORY https://github.com/nothings/stb.git
-  GIT_TAG        master
-)
-FetchContent_MakeAvailable(stb)
+FetchContent_MakeAvailable(raylib)
 
 # QuickJS
 FetchContent_Declare(
@@ -41,18 +35,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(miniz)
 
-# Fetch Nuklear (Immediate Mode GUI)
-FetchContent_Declare(
-  nuklear
-  GIT_REPOSITORY https://github.com/Immediate-Mode-UI/Nuklear.git
-  GIT_TAG master
-)
-FetchContent_MakeAvailable(nuklear)
-
-# Create Interface Library for Nuklear (Header Only)
-add_library(nuklear INTERFACE)
-target_include_directories(nuklear INTERFACE ${nuklear_SOURCE_DIR})
-
 add_executable(boomer
   src/main.c
   src/video/video.c
@@ -69,23 +51,18 @@ add_executable(boomer
 # Include directories
 target_include_directories(boomer PRIVATE 
     src 
-    ${SDL2_INCLUDE_DIRS} 
-    ${stb_SOURCE_DIR}
     ${quickjs_SOURCE_DIR}
     ${miniz_SOURCE_DIR}
-    ${nuklear_SOURCE_DIR}
-    ${nuklear_SOURCE_DIR}/demo/sdl_renderer
 )
 
 # Link libraries
-target_link_libraries(boomer PRIVATE SDL2::SDL2 -lm qjs miniz)
+target_link_libraries(boomer PRIVATE raylib qjs miniz -lm)
 
 if(EMSCRIPTEN)
     set_target_properties(boomer PROPERTIES SUFFIX ".html")
+    # Emscripten flags for Raylib
     target_link_options(boomer PRIVATE 
-        -sUSE_SDL=2 
-        -sUSE_SDL_IMAGE=2 
-        -sSDL2_IMAGE_FORMATS=["png"] 
+        -sUSE_GLFW=3
         -sALLOW_MEMORY_GROWTH=1
         --shell-file "${CMAKE_SOURCE_DIR}/src/wasm_shell.html"
         --preload-file "${CMAKE_SOURCE_DIR}/games/demo@games/demo"

@@ -1,13 +1,12 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include "SDL.h"
+#include "raylib.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 
 #include "core/types.h"
-#include "core/math_utils.h"
 #include "video/video.h"
 #include "video/texture.h"
 #include "render/renderer.h"
@@ -26,8 +25,7 @@ typedef struct {
 
 // --- Global State for Main Loop ---
 static bool running = true;
-static InputState input = {0};
-static u32 last_time = 0;
+static InputState input = {false};
 static bool editor_has_focus = false;
 
 static TextureID tex_wall;
@@ -71,85 +69,67 @@ static Map map = {
     .sector_count = 3
 };
 
-static Camera cam = {
+static GameCamera cam = {
     .pos = {2.0f, 2.0f, 0.75f}, // Start inside Sector 0
     .yaw = 0.0f
 };
 
 // --- Loop Function ---
 void Loop(void) {
-    if (!running) {
+    if (!running || WindowShouldClose()) {
+        running = false;
         #ifdef __EMSCRIPTEN__
         emscripten_cancel_main_loop();
         #endif
         return;
     }
 
-    // Capture Editor State at start of frame to ensure consistent Input Begin/End pairing
-    bool editor_was_active = Editor_IsActive();
+    // Input Poll - Handled by Raylib
 
-    // Input Poll
-    if (editor_was_active) Editor_InputBegin();
-    
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-            // Global Toggles
-        if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_F12) {
-                Editor_Toggle();
-            }
-        }
-        
-        // Pass to Editor (if it was active at start of frame)
-        // Even if we toggle OFF during this frame, we finish the input frame for the editor.
-        if (editor_was_active) {
-            if (Editor_HandleEvent(&event)) {
-                editor_has_focus = true; // Mouse is over UI
-            } else {
-                editor_has_focus = false;
-            }
-        }
-
-        if (event.type == SDL_QUIT) {
-            running = false;
-        } else if (event.type == SDL_KEYDOWN) {
-            switch (event.key.keysym.sym) {
-                case SDLK_F9:
-                    Video_ChangeScale(-1);
-                    break;
-                case SDLK_F11:
-                    Video_ChangeScale(1);
-                    break;
-                case SDLK_F10:
-                    Video_ToggleFullscreen();
-                    break;
-                case SDLK_ESCAPE:
-                    running = false;
-                    break;
-            }
-        }
+    // Global Toggles
+    if (IsKeyPressed(KEY_F12)) {
+        Editor_Toggle();
     }
     
-    if (editor_was_active) Editor_InputEnd();
+    // Pass to Editor
+    if (Editor_IsActive()) {
+        Editor_InputBegin();
+        if (Editor_HandleInput()) {
+            editor_has_focus = true; // Mouse is over UI
+        } else {
+            editor_has_focus = false;
+        }
+        Editor_InputEnd();
+    }
+
+    if (IsKeyPressed(KEY_F9)) {
+        Video_ChangeScale(-1);
+    }
+    if (IsKeyPressed(KEY_F11)) {
+        Video_ChangeScale(1);
+    }
+    if (IsKeyPressed(KEY_F10)) {
+        Video_ToggleFullscreen();
+    }
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        running = false;
+    }
     
     // Game Input Handling
     if (!Editor_IsActive()) {
-        const u8* keys = SDL_GetKeyboardState(NULL);
-        input.forward = keys[SDL_SCANCODE_W];
-        input.backward = keys[SDL_SCANCODE_S];
-        input.left = keys[SDL_SCANCODE_A]; 
-        input.right = keys[SDL_SCANCODE_D]; 
-        input.turn_left = keys[SDL_SCANCODE_LEFT];
-        input.turn_right = keys[SDL_SCANCODE_RIGHT];
-        input.u = keys[SDL_SCANCODE_Q];
-        input.d = keys[SDL_SCANCODE_E];
+        input.forward = IsKeyDown(KEY_W);
+        input.backward = IsKeyDown(KEY_S);
+        input.left = IsKeyDown(KEY_A); 
+        input.right = IsKeyDown(KEY_D); 
+        input.turn_left = IsKeyDown(KEY_LEFT);
+        input.turn_right = IsKeyDown(KEY_RIGHT);
+        input.u = IsKeyDown(KEY_Q);
+        input.d = IsKeyDown(KEY_E);
     } else {
             input = (InputState){0};
     }
 
-    u32 current_time = SDL_GetTicks();
-    f32 dt = (current_time - last_time) / 1000.0f;
-    last_time = current_time;
+    f32 dt = GetFrameTime();
     
     // Cam Update
     f32 move_speed = 3.0f * dt;
@@ -197,9 +177,9 @@ void Loop(void) {
             Video_DrawGame(NULL); // Fill
         } else {
             // 2D View
-            int w, h;
-            SDL_GetWindowSize(Video_GetWindow(), &w, &h);
-            Render_Map2D(Video_GetRenderer(), &map, cam, 0, 0, w, h, 32.0f, Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex()); 
+            int w = GetScreenWidth();
+            int h = GetScreenHeight();
+            Render_Map2D(&map, cam, 0, 0, w, h, 32.0f, Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex()); 
         }
         
         // Draw UI
@@ -250,7 +230,7 @@ int main(int argc, char** argv) {
     }
     
     // Init Editor
-    Editor_Init(Video_GetWindow(), Video_GetRenderer());
+    Editor_Init();
     
     Renderer_Init();
     Texture_Init();
@@ -264,12 +244,11 @@ int main(int argc, char** argv) {
     cam.pos = (Vec3){2.0f, 2.0f, 1.5f};
 
     // 3. Game Loop
-    last_time = SDL_GetTicks();
     
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(Loop, 0, 1);
 #else
-    while (running) {
+    while (running && !WindowShouldClose()) {
         Loop();
     }
     

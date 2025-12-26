@@ -32,9 +32,7 @@ typedef struct {
     f32 x, y, z, w;
 } Vec4;
 
-// Color type (RGBA 8-bit per channel)
-typedef struct {
-    u8 r, g, b, a;
-} Color;
+#include "raylib.h"
+// Color type is now provided by raylib.h
 
 #endif // BOOMER_CORE_TYPES_H

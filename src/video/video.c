@@ -1,11 +1,8 @@
 #include "video.h"
 #include "texture.h"
-#include <SDL.h>
+#include "raylib.h"
 #include <stdio.h>
-
-static SDL_Window* window = NULL;
-static SDL_Renderer* renderer = NULL;
-static SDL_Texture* texture = NULL;
+#include <stdlib.h> // abs
 
 // Exposed buffer
 static u32 frame_buffer[VIDEO_WIDTH * VIDEO_HEIGHT];
@@ -14,51 +11,49 @@ u32* video_pixels = frame_buffer;
 static int current_scale = 4;
 static bool is_fullscreen = false;
 
-bool Video_Init(const char* title) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("SDL Init Failed: %s\n", SDL_GetError());
-        return false;
-    }
+// Raylib specific
+static Texture2D screen_texture;
+static bool texture_ready = false;
 
+bool Video_Init(const char* title) {
+    // Raylib Init
+    SetTraceLogLevel(LOG_WARNING); // Reduce noise
+    
+    // We want the window to be scalable
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+    
     int width = VIDEO_WIDTH * current_scale;
     int height = VIDEO_HEIGHT * current_scale;
-
-    window = SDL_CreateWindow(title, 
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-        width, height, 
-        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-        
-    if (!window) {
-        printf("Window Create Failed: %s\n", SDL_GetError());
-        return false;
-    }
-
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!renderer) {
-        printf("Renderer Create Failed: %s\n", SDL_GetError());
+    
+    InitWindow(width, height, title);
+    
+    if (!IsWindowReady()) {
+        printf("Video: Raylib InitWindow failed.\n");
         return false;
     }
     
-    SDL_RenderSetVSync(renderer, 1);
-
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, VIDEO_WIDTH, VIDEO_HEIGHT);
-    if (!texture) {
-        printf("Texture Create Failed: %s\n", SDL_GetError());
-        return false;
-    }
+    // Create a texture to dump our framebuffer into
+    // Raylib LoadTextureFromImage requires an Image.
+    // We'll create a blank image first or just create texture entirely?
+    // GenTexture is not exposed directly for empty.
+    // We use LoadTextureFromImage with a blank image.
+    Image img = GenImageColor(VIDEO_WIDTH, VIDEO_HEIGHT, BLACK);
+    screen_texture = LoadTextureFromImage(img);
+    UnloadImage(img);
+    SetTextureFilter(screen_texture, TEXTURE_FILTER_POINT); // Pixel art style
+    
+    texture_ready = true;
 
     return true;
 }
 
 void Video_Shutdown(void) {
-    if (texture) SDL_DestroyTexture(texture);
-    if (renderer) SDL_DestroyRenderer(renderer);
-    if (window) SDL_DestroyWindow(window);
-    SDL_Quit();
+    if (texture_ready) UnloadTexture(screen_texture);
+    CloseWindow();
 }
 
 void Video_ChangeScale(int delta) {
-    if (is_fullscreen) return; // Don't resize in fullscreen mode? Or update for when we exit.
+    if (IsWindowFullscreen()) return;
 
     current_scale += delta;
     if (current_scale < 1) current_scale = 1;
@@ -66,25 +61,21 @@ void Video_ChangeScale(int delta) {
 
     int w = VIDEO_WIDTH * current_scale;
     int h = VIDEO_HEIGHT * current_scale;
-
-    SDL_SetWindowSize(window, w, h);
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    
+    SetWindowSize(w, h);
+    // Center window logic is a bit manual in Raylib or we assume OS handles it.
+    // Raylib doesn't have explicit "Center Window" command easily exposed without getting monitor info.
+    int monitor = GetCurrentMonitor();
+    int mx = GetMonitorWidth(monitor);
+    int my = GetMonitorHeight(monitor);
+    SetWindowPosition((mx - w)/2, (my - h)/2);
+    
     printf("Window Scale: %dx (%dx%d)\n", current_scale, w, h);
 }
 
 void Video_ToggleFullscreen(void) {
-    is_fullscreen = !is_fullscreen;
-
-    if (is_fullscreen) {
-        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // Borderless
-    } else {
-        SDL_SetWindowFullscreen(window, 0);
-        // Restore size
-        int w = VIDEO_WIDTH * current_scale;
-        int h = VIDEO_HEIGHT * current_scale;
-        SDL_SetWindowSize(window, w, h);
-        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    }
+    ToggleFullscreen(); // Raylib handles this
+    is_fullscreen = IsWindowFullscreen();
 }
 
 void Video_Clear(Color color) {
@@ -99,60 +90,55 @@ void Video_PutPixel(int x, int y, Color color) {
     video_pixels[y * VIDEO_WIDTH + x] = (color.a << 24) | (color.b << 16) | (color.g << 8) | color.r;
 }
 
-// Accessors
-SDL_Window* Video_GetWindow(void) { return window; }
-SDL_Renderer* Video_GetRenderer(void) { return renderer; }
-
 void Video_BeginFrame(void) {
-    SDL_UpdateTexture(texture, NULL, video_pixels, VIDEO_WIDTH * sizeof(u32));
-    SDL_RenderClear(renderer); // Clear backing (black)
+    // Prepare for drawing
+    // In our case, we might update texture here?
+    // Raylib's BeginDrawing() clears screen usually.
+    BeginDrawing();
+    ClearBackground(BLACK); // Clear "back" of window
 }
 
-void Video_DrawGame(SDL_Rect* dst_rect) {
-    if (dst_rect) {
-        SDL_RenderSetViewport(renderer, NULL);
-        SDL_RenderCopy(renderer, texture, NULL, dst_rect);
-    } else {
-        if (is_fullscreen) {
-            // Integer Scaling Logic
-            int w, h;
-            SDL_GetWindowSize(window, &w, &h);
-            // printf("FS Size: %dx%d\n", w, h); // Debug: Check if size is plausible
-            
-            int scale_w = w / VIDEO_WIDTH;
-            int scale_h = h / VIDEO_HEIGHT;
-            int scale = (scale_w < scale_h) ? scale_w : scale_h;
-            if (scale < 1) scale = 1;
-            
-            SDL_Rect dst;
-            dst.w = VIDEO_WIDTH * scale;
-            dst.h = VIDEO_HEIGHT * scale;
-            dst.x = (w - dst.w) / 2;
-            dst.y = (h - dst.h) / 2;
-            
-            SDL_RenderSetViewport(renderer, NULL);
-            SDL_RenderCopy(renderer, texture, NULL, &dst);
-        } else {
-            // Windowed - Fill Window
-            SDL_RenderSetViewport(renderer, NULL);
-            SDL_RenderCopy(renderer, texture, NULL, NULL);
-        }
-    }
+void Video_DrawGame(void* dst_rect) {
+    (void)dst_rect; // Ignored for now
+    
+    // Update GPU texture from CPU buffer
+    UpdateTexture(screen_texture, video_pixels);
+    
+    // Draw texture scaled to window
+    // Calculate integer scaling
+    float screenW = (float)GetScreenWidth();
+    float screenH = (float)GetScreenHeight();
+    
+    float scale = (screenW / VIDEO_WIDTH) < (screenH / VIDEO_HEIGHT) ? (screenW / VIDEO_WIDTH) : (screenH / VIDEO_HEIGHT);
+    if (scale < 1.0f) scale = 1.0f;
+    // Floor scale for integer scaling if desired, or keep specific aspect ratio
+    scale = (float)(int)scale; // Enforce integer scaling
+    
+    float viewW = VIDEO_WIDTH * scale;
+    float viewH = VIDEO_HEIGHT * scale;
+    
+    float x = (screenW - viewW) * 0.5f;
+    float y = (screenH - viewH) * 0.5f;
+    
+    Rectangle src = { 0, 0, (float)VIDEO_WIDTH, (float)VIDEO_HEIGHT };
+    Rectangle dst = { x, y, viewW, viewH };
+    
+    DrawTexturePro(screen_texture, src, dst, (Vector2){0,0}, 0.0f, WHITE);
 }
 
 void Video_EndFrame(void) {
-    SDL_RenderPresent(renderer);
+    EndDrawing();
 }
 
-// Deprecated / Wrapper
 void Video_Present(void) {
     Video_BeginFrame();
     Video_DrawGame(NULL);
     Video_EndFrame();
 }
 
+// Primitives directly into pixel buffer (Software Rendering)
 void Video_DrawLine(int x0, int y0, int x1, int y1, Color color) {
-    int dx =abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     int err = dx + dy, e2;
 
@@ -186,15 +172,12 @@ void Video_DrawVertLine(int x, int y1, int y2, Color color) {
     }
 }
 
-void Video_DrawTexturedColumn(int x, int y_start, int y_end, Texture* tex, int tex_x, float v_start, float v_step) {
+void Video_DrawTexturedColumn(int x, int y_start, int y_end, struct GameTexture* tex, int tex_x, float v_start, float v_step) {
     if (x < 0 || x >= VIDEO_WIDTH) return;
     
     int y1 = y_start;
     int y2 = y_end;
     
-    // Don't swap here, assume y_start is "top" and y_end is "bottom" in standard coords...
-    // But rendering goes from top to bottom on screen.
-    // If y1 > y2, it's inverted, but let's assume valid range.
     if (y1 > y2) return; 
 
     // Clip Top
@@ -211,18 +194,15 @@ void Video_DrawTexturedColumn(int x, int y_start, int y_end, Texture* tex, int t
     float v = v_start;
     u32 th = tex->height;
     u32 tw = tex->width;
-    u32* tex_pixels = tex->pixels; // Renamed to avoid conflict with global 'pixels'
+    u32* tex_pixels = tex->pixels; 
     
-    // Wrap tex_x just in case
-    tex_x = tex_x % tw;
+    tex_x = tex_x % tw; // Wrap width
     
     for (int y = y1; y <= y2; ++y) {
-        // Sample
-        u32 tex_y = (u32)v % th;
+        int tex_y = (int)v % th;
         u32 color = tex_pixels[tex_y * tw + tex_x];
         
-        // Plot (Copy u32 directly)
-        video_pixels[y * VIDEO_WIDTH + x] = color; // Changed to global 'pixels'
+        video_pixels[y * VIDEO_WIDTH + x] = color;
         
         v += v_step;
     }

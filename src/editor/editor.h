@@ -2,28 +2,26 @@
 #define EDITOR_H
 
 #include <stdbool.h>
-#include <SDL.h>
 
 struct Map;
-struct Camera;
+struct GameCamera;
 
 // Initialize the Editor system
-void Editor_Init(SDL_Window* window, SDL_Renderer* renderer);
+void Editor_Init(void);
 
-// Handle SDL Events for Editor
 // Editor Input Frame Control
 void Editor_InputBegin(void);
 void Editor_InputEnd(void);
 
-// Pass SDL Event to Editor (Call between Begin/End)
-// Returns true if the editor consumed the event
-bool Editor_HandleEvent(SDL_Event* event);
+// Handle Input for Editor 
+// Returns true if the editor consumed the input
+bool Editor_HandleInput(void);
 
 // Update Editor State (Input, Logic)
-void Editor_Update(struct Map* map, struct Camera* cam);
+void Editor_Update(struct Map* map, struct GameCamera* cam);
 
 // Render Editor UI
-void Editor_Render(struct Map* map, struct Camera* cam);
+void Editor_Render(struct Map* map, struct GameCamera* cam);
 
 // Shutdown Editor
 void Editor_Shutdown(void);

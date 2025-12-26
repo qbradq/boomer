@@ -3,9 +3,9 @@
 
 #include "../core/types.h"
 #include <stdbool.h>
-#include <SDL.h>
 
 struct Texture; // Forward declaration
+struct GameTexture;
 
 // Video configuration
 #define VIDEO_WIDTH  320
@@ -29,7 +29,7 @@ void Video_ToggleFullscreen(void);
 // Clear the framebuffer with a specific color
 void Video_Clear(Color color);
 
-// Set a pixel in the framebufferSAFE
+// Set a pixel in the framebuffer
 void Video_PutPixel(int x, int y, Color color);
 
 // Draw a line
@@ -39,16 +39,12 @@ void Video_DrawLine(int x0, int y0, int x1, int y1, Color color);
 void Video_DrawVertLine(int x, int y1, int y2, Color color);
 
 // Draw a textured column
-void Video_DrawTexturedColumn(int x, int y_start, int y_end, struct Texture* tex, int tex_x, float v_start, float v_step);
+void Video_DrawTexturedColumn(int x, int y_start, int y_end, struct GameTexture* tex, int tex_x, float v_start, float v_step);
 
 // --- Advanced Rendering Pipeline (For Editor) ---
 void Video_BeginFrame(void);
-void Video_DrawGame(SDL_Rect* dst_rect); // If NULL, fills screen/window
+void Video_DrawGame(void* dst_rect); // If NULL, fills screen/window
 void Video_EndFrame(void);
-
-// Accessors for Nuklear/Editor
-SDL_Window* Video_GetWindow(void);
-SDL_Renderer* Video_GetRenderer(void);
 
 // Present the framebuffer to the screen
 void Video_Present(void);

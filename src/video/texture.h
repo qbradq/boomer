@@ -5,11 +5,11 @@
 
 typedef i32 TextureID;
 
-typedef struct Texture {
+typedef struct GameTexture {
     u32 width, height;
     u32 channels;
     u32* pixels; // ABGR/ARGB buffer
-} Texture;
+} GameTexture;
 
 // Initialize Texture Manager
 void Texture_Init(void);
@@ -20,7 +20,7 @@ void Texture_Shutdown(void);
 TextureID Texture_Load(const char* path);
 
 // Get Texture by ID
-Texture* Texture_Get(TextureID id);
+GameTexture* Texture_Get(TextureID id);
 
 // Get Texture ID by name (path) if loaded, else -1
 TextureID Texture_GetID(const char* name);

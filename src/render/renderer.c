@@ -2,6 +2,7 @@
 #include "../video/video.h"
 #include "../video/texture.h"
 #include "../core/math_utils.h"
+#include "raylib.h"
 #include <math.h>
 
 #ifndef max
@@ -12,7 +13,7 @@
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
-#define FOV_H DEG2RAD(90.0f)
+#define FOV_H (90.0f * DEG2RAD)
 #define NEAR_Z 0.1f
 #define MAX_RECURSION 16
 
@@ -22,7 +23,7 @@ void Renderer_Init(void) {
 
 // Transform World Position to Camera Relative (Rotated & Translated)
 // P_cam = Rot(-Yaw) * (P_world - Cam_pos)
-static Vec3 TransformToCamera(Vec3 p, Camera cam) {
+static Vec3 TransformToCamera(Vec3 p, GameCamera cam) {
     Vec3 local = vec3_sub(p, cam.pos);
     f32 cs = cosf(-cam.yaw);
     f32 sn = sinf(-cam.yaw);
@@ -34,7 +35,7 @@ static Vec3 TransformToCamera(Vec3 p, Camera cam) {
     };
 }
 
-bool WorldToScreen(Vec3 world_pos, Camera cam, Vec2* screen_out) {
+bool WorldToScreen(Vec3 world_pos, GameCamera cam, Vec2* screen_out) {
     Vec3 p = TransformToCamera(world_pos, cam);
     
     if (p.x < NEAR_Z) return false;
@@ -77,7 +78,7 @@ static bool ClipWall(Vec3 p1, Vec3 p2, Vec3* out1, Vec3* out2, f32* t1, f32* t2)
 }
 
 // Helper to draw Floor/Ceiling Span
-static void DrawFlat(int x, int y1, int y2, f32 height_diff, Camera cam, Texture* tex) {
+static void DrawFlat(int x, int y1, int y2, f32 height_diff, GameCamera cam, GameTexture* tex) {
     if (y1 > y2) return;
     if (!tex) {
         Video_DrawVertLine(x, y1, y2, (Color){50, 50, 50, 255}); // Gray fallback
@@ -135,7 +136,7 @@ static void DrawFlat(int x, int y1, int y2, f32 height_diff, Camera cam, Texture
 }
 
 // Recursive Sector Render with Y-Clipping
-static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, int max_x, i16* y_top, i16* y_bot, int depth) {
+static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x, int max_x, i16* y_top, i16* y_bot, int depth) {
     if (depth > MAX_RECURSION) return;
     if (min_x >= max_x) return;
 
@@ -144,8 +145,8 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
     f32 center_x = VIDEO_WIDTH / 2.0f;
     f32 center_y = VIDEO_HEIGHT / 2.0f;
     
-    Texture* floor_tex = Texture_Get(sector->floor_tex_id);
-    Texture* ceil_tex = Texture_Get(sector->ceil_tex_id);
+    GameTexture* floor_tex = Texture_Get(sector->floor_tex_id);
+    GameTexture* ceil_tex = Texture_Get(sector->ceil_tex_id);
 
     for (u32 w = 0; w < sector->num_walls; ++w) {
         WallID wid = sector->first_wall + w;
@@ -228,9 +229,9 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
             }
             
             // Wall / Portal Window
-            Texture* top_tex = Texture_Get(wall->top_texture_id);
-            Texture* bot_tex = Texture_Get(wall->bottom_texture_id);
-            Texture* wall_tex = Texture_Get(wall->texture_id);
+            GameTexture* top_tex = Texture_Get(wall->top_texture_id);
+            GameTexture* bot_tex = Texture_Get(wall->bottom_texture_id);
+            GameTexture* wall_tex = Texture_Get(wall->texture_id);
 
             int wy_top = cy_top;
             int wy_bot = cy_bot;
@@ -340,7 +341,7 @@ static void RenderSector(Map* map, Camera cam, SectorID sector_id, int min_x, in
     }
 }
 
-void Render_Frame(Camera cam, Map* map) {
+void Render_Frame(GameCamera cam, Map* map) {
     SectorID start_sector = GetSectorAt(map, (Vec2){cam.pos.x, cam.pos.y});
     if (start_sector == -1) start_sector = 0; 
     
@@ -357,28 +358,29 @@ void Render_Frame(Camera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, int w, int h, float zoom, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index) {
+void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zoom, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index) {
     // Set viewport/clip
-    SDL_Rect view = {x, y, w, h};
-    SDL_RenderSetViewport(ren, &view);
+    // Raylib scissor test for viewport clipping
+    BeginScissorMode(x, y, w, h);
     
     // Background
-    SDL_SetRenderDrawColor(ren, 30, 30, 40, 255);
-    SDL_RenderFillRect(ren, NULL); // Fills viewport
+    DrawRectangle(x, y, w, h, (Color){30, 30, 40, 255});
     
     // Center is (w/2, h/2) representing CameraPos
-    float cx = w / 2.0f;
-    float cy = h / 2.0f;
+    // We need to offset by x,y because we are drawing in screen coordinates
+    float cx = x + w / 2.0f;
+    float cy = y + h / 2.0f;
     
     // Draw Grid (Optional)
-    SDL_SetRenderDrawColor(ren, 50, 50, 60, 255);
     int grid_size = (int)(zoom);
     if (grid_size > 4) {
         int off_x = (int)(cx - cam.pos.x * zoom) % grid_size;
         int off_y = (int)(cy + cam.pos.y * zoom) % grid_size;
         
-        for (int gx = off_x; gx < w; gx += grid_size) SDL_RenderDrawLine(ren, gx, 0, gx, h);
-        for (int gy = off_y; gy < h; gy += grid_size) SDL_RenderDrawLine(ren, 0, gy, w, gy);
+        // Adjust for viewport x,y
+        // Grid lines should be relative to viewport
+        for (int gx = x + off_x; gx < x + w; gx += grid_size) DrawLine(gx, y, gx, y + h, (Color){50, 50, 60, 255});
+        for (int gy = y + off_y; gy < y + h; gy += grid_size) DrawLine(x, gy, x + w, gy, (Color){50, 50, 60, 255});
     }
     
     // Draw Walls
@@ -390,18 +392,19 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
         float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
         float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
         
+        Color col;
         if (wall->next_sector != -1) {
-            SDL_SetRenderDrawColor(ren, 200, 50, 50, 255); 
+            col = (Color){200, 50, 50, 255}; 
         } else {
-            SDL_SetRenderDrawColor(ren, 200, 200, 200, 255);
+            col = (Color){200, 200, 200, 255};
         }
-        SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
+        DrawLineV((Vector2){x1, y1}, (Vector2){x2, y2}, col);
     }
     
     // Render Highlighted/Hovered Sector
     if (hovered_sector != -1 && hovered_sector != highlight_sector && hovered_sector < map->sector_count) {
          Sector* s = &map->sectors[hovered_sector];
-         SDL_SetRenderDrawColor(ren, 0, 255, 0, 255); // Lime Green
+         Color h_col = (Color){0, 255, 0, 255}; // Lime Green
          
          for (u32 i = 0; i < s->num_walls; ++i) {
             Wall* wall = &map->walls[s->first_wall + i];
@@ -410,7 +413,7 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
             float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
             float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
             
-            SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
+            DrawLineV((Vector2){x1, y1}, (Vector2){x2, y2}, h_col);
             
             // Normals (Inward: dy, -dx)
              float nx = (y2 - y1);
@@ -418,12 +421,11 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
              float len = sqrtf(nx*nx + ny*ny);
              if (len > 0) {
                  nx /= len; ny /= len;
-                 SDL_RenderDrawLineF(ren, (x1+x2)/2, (y1+y2)/2, (x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8);
+                 DrawLineV((Vector2){(x1+x2)/2, (y1+y2)/2}, (Vector2){(x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8}, h_col);
              }
              
              // Vertices
-             SDL_FRect r = {x1 - 2, y1 - 2, 5, 5}; // 5x5
-             SDL_RenderFillRectF(ren, &r);
+             DrawRectangle((int)x1 - 2, (int)y1 - 2, 5, 5, h_col);
          }
     }
     
@@ -438,18 +440,19 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
             float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
             
             // Highlight Logic for Walls
+            Color w_col;
             if ((int)i == highlight_wall_index) {
-                SDL_SetRenderDrawColor(ren, 0, 255, 255, 255); // Cyan
+                w_col = (Color){0, 255, 255, 255}; // Cyan
             } 
             else if ((int)i == hovered_wall_index) {
-                SDL_SetRenderDrawColor(ren, 0, 255, 0, 255); // Lime Green
+                w_col = (Color){0, 255, 0, 255}; // Lime Green
             }
             else {
-                SDL_SetRenderDrawColor(ren, 255, 255, 0, 255); // Yellow for Sector
+                w_col = (Color){255, 255, 0, 255}; // Yellow for Sector
             }
             
             // Draw Line
-            SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
+            DrawLineV((Vector2){x1, y1}, (Vector2){x2, y2}, w_col);
             
             // Draw Tick Normal (Inward)
              float nx = (y2 - y1);
@@ -457,7 +460,7 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
              float len = sqrtf(nx*nx + ny*ny);
              if (len > 0) {
                  nx /= len; ny /= len;
-                 SDL_RenderDrawLineF(ren, (x1+x2)/2, (y1+y2)/2, (x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8);
+                 DrawLineV((Vector2){(x1+x2)/2, (y1+y2)/2}, (Vector2){(x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8}, w_col);
              }
              
              // Vertices (5x5)
@@ -465,22 +468,18 @@ void Render_Map2D(struct SDL_Renderer* ren, Map* map, Camera cam, int x, int y, 
              if ((int)i == highlight_wall_index) v_col = (Color){0, 255, 255, 255}; // Cyan
              else if ((int)i == hovered_wall_index) v_col = (Color){0, 255, 0, 255}; // Lime Green
              
-             SDL_SetRenderDrawColor(ren, v_col.r, v_col.g, v_col.b, v_col.a);
-             SDL_FRect r = {x1 - 2, y1 - 2, 5, 5};
-             SDL_RenderFillRectF(ren, &r);
+             DrawRectangle((int)x1 - 2, (int)y1 - 2, 5, 5, v_col);
         }
     }
     
     // Draw Camera
-    SDL_SetRenderDrawColor(ren, 0, 255, 0, 255);
-    SDL_FRect player = {cx - 3, cy - 3, 6, 6};
-    SDL_RenderFillRectF(ren, &player);
+    DrawRectangle((int)cx - 3, (int)cy - 3, 6, 6, (Color){0, 255, 0, 255});
     
     // Frustum
     float dir_len = 20.0f;
     float cs = cosf(cam.yaw); 
     float sn = sinf(cam.yaw);
-    SDL_RenderDrawLineF(ren, cx, cy, cx + cs * dir_len, cy - sn * dir_len);
+    DrawLine((int)cx, (int)cy, (int)(cx + cs * dir_len), (int)(cy - sn * dir_len), (Color){0, 255, 0, 255});
     
-    SDL_RenderSetViewport(ren, NULL);
+    EndScissorMode();
 }
