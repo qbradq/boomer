@@ -125,32 +125,31 @@ void Video_BeginFrame(void) {
     ClearBackground(BLACK); // Clear "back" of window
 }
 
-void Video_DrawGame(void* dst_rect) {
-    (void)dst_rect; // Ignored for now
-    
-    // Update GPU texture from CPU buffer
+void Video_DrawGame(const Rectangle* dst_rect) {
     UpdateTexture(screen_texture, video_pixels);
     
-    // Draw texture scaled to window
-    // Calculate integer scaling
-    float screenW = (float)GetScreenWidth();
-    float screenH = (float)GetScreenHeight();
-    
-    float scale = (screenW / VIDEO_WIDTH) < (screenH / VIDEO_HEIGHT) ? (screenW / VIDEO_WIDTH) : (screenH / VIDEO_HEIGHT);
-    if (scale < 1.0f) scale = 1.0f;
-    // Floor scale for integer scaling if desired, or keep specific aspect ratio
-    scale = (float)(int)scale; // Enforce integer scaling
-    
-    float viewW = VIDEO_WIDTH * scale;
-    float viewH = VIDEO_HEIGHT * scale;
-    
-    float x = (screenW - viewW) * 0.5f;
-    float y = (screenH - viewH) * 0.5f;
-    
     Rectangle src = { 0, 0, (float)VIDEO_WIDTH, (float)VIDEO_HEIGHT };
-    Rectangle dst = { x, y, viewW, viewH };
     
-    DrawTexturePro(screen_texture, src, dst, (Vector2){0,0}, 0.0f, WHITE);
+    if (dst_rect) {
+        DrawTexturePro(screen_texture, src, *dst_rect, (Vector2){0,0}, 0.0f, WHITE);
+    } else {
+        // Calculate integer scaling for full screen
+        float screenW = (float)GetScreenWidth();
+        float screenH = (float)GetScreenHeight();
+        
+        float scale = (screenW / VIDEO_WIDTH) < (screenH / VIDEO_HEIGHT) ? (screenW / VIDEO_WIDTH) : (screenH / VIDEO_HEIGHT);
+        if (scale < 1.0f) scale = 1.0f;
+        scale = (float)(int)scale; // Enforce integer scaling
+        
+        float viewW = VIDEO_WIDTH * scale;
+        float viewH = VIDEO_HEIGHT * scale;
+        
+        float x = (screenW - viewW) * 0.5f;
+        float y = (screenH - viewH) * 0.5f;
+        
+        Rectangle dst = { x, y, viewW, viewH };
+        DrawTexturePro(screen_texture, src, dst, (Vector2){0,0}, 0.0f, WHITE);
+    }
 }
 
 void Video_EndFrame(void) {

@@ -27,13 +27,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(quickjs)
 
-# Fetch miniz (zip reader)
+# Miniz
 FetchContent_Declare(
     miniz
     GIT_REPOSITORY https://github.com/richgel999/miniz.git
     GIT_TAG 2.2.0
 )
 FetchContent_MakeAvailable(miniz)
+
+# Raygui 4.0
+FetchContent_Declare(
+    raygui
+    GIT_REPOSITORY https://github.com/raysan5/raygui.git
+    GIT_TAG 4.0
+)
+FetchContent_MakeAvailable(raygui)
 
 add_executable(boomer
   src/main.c
@@ -48,6 +56,7 @@ add_executable(boomer
   src/game/entity.c
   src/editor/editor.c
   src/ui/console.c
+  src/ui/gui_impl.c
 )
 
 # Include directories
@@ -55,6 +64,7 @@ target_include_directories(boomer PRIVATE
     src 
     ${quickjs_SOURCE_DIR}
     ${miniz_SOURCE_DIR}
+    ${raygui_SOURCE_DIR}/src
 )
 
 # Link libraries
@@ -71,6 +81,3 @@ if(EMSCRIPTEN)
         -lidbfs.js
     )
 endif()
-
-# Copy compile commands for tooling
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

@@ -43,10 +43,15 @@ void Video_DrawVertLine(int x, int y1, int y2, Color color);
 
 // Draw a textured column
 void Video_DrawTexturedColumn(int x, int y_start, int y_end, struct GameTexture* tex, int tex_x, float v_start, float v_step);
+// Draws the game content to the screen. 
+// If dest_rect is NULL, draws to full screen (centered/scaled).
+// Otherwise draws to dest_rect.
+void Video_DrawGame(const Rectangle* dest_rect);
 
 // --- Advanced Rendering Pipeline (For Editor) ---
 void Video_BeginFrame(void);
-void Video_DrawGame(void* dst_rect); // If NULL, fills screen/window
+void Video_EndFrame(void);
+
 void Video_EndFrame(void);
 
 // Present the framebuffer to the screen

@@ -4,9 +4,17 @@
 #include <stdbool.h>
 
 struct Map;
+#include <raylib.h> // For Rectangle
+
+struct Map;
 struct GameCamera;
 
 // Initialize the Editor system
+void Editor_Init(void);
+
+// Get the viewport for the game/map rendering (excluding editor UI)
+Rectangle GetGameViewRect(void);
+
 void Editor_Init(void);
 
 // Editor Input Frame Control

@@ -164,7 +164,7 @@ void Loop(void) {
         if (Config_IsActionPressed("game_menu")) {
             printf("Game Menu (Stub)\n");
         }
-    } else if (Editor_IsActive()) {
+    } else if (Editor_IsActive() && !editor_has_focus) {
          if (Config_IsActionPressed("editor_zoom_in")) printf("Editor Zoom In (Stub)\n");
          if (Config_IsActionPressed("editor_zoom_out")) printf("Editor Zoom Out (Stub)\n");
     } else {
@@ -210,14 +210,15 @@ void Loop(void) {
     
     if (Editor_IsActive()) {
         Editor_Update(&map, &cam);
+        
+        Rectangle game_rect = GetGameViewRect();
+        
         int view = Editor_GetViewMode();
         if (view == 0) {
             Render_Frame(cam, &map);
-            Video_DrawGame(NULL); 
+            Video_DrawGame(&game_rect); 
         } else {
-             int w = GetScreenWidth();
-             int h = GetScreenHeight();
-             Render_Map2D(&map, cam, 0, 0, w, h, 0.5f, 
+             Render_Map2D(&map, cam, (int)game_rect.x, (int)game_rect.y, (int)game_rect.width, (int)game_rect.height, 0.5f, 
                 Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), 
                 Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex()); 
         }
