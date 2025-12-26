@@ -1,33 +1,55 @@
 {
-  "textures": [
-    { "id": 0, "path": "modern/inner_wall_1.png" },
-    { "id": 1, "path": "grid_blue.png" },
-    { "id": 2, "path": "modern/wood_0.png" }
-  ],
-  "sectors": [
-    {
-      "floor_height": 0.0,
-      "ceil_height": 192.0,
-      "floor_tex": 1,
-      "ceil_tex": 1,
-      "walls": [
-         { "p1": [0, 0], "p2": [640, 0], "tex": 0, "portal": -1 },
-         { "p1": [640, 0], "p2": [640, 640], "tex": 2, "portal": 1 },
-         { "p1": [640, 640], "p2": [0, 640], "tex": 0, "portal": -1 },
-         { "p1": [0, 640], "p2": [0, 0], "tex": 0, "portal": -1 } 
-      ]
-    },
-    {
-       "floor_height": 32.0, "ceil_height": 256.0, "floor_tex": 1, "ceil_tex": 1,
-       "walls": [
-         { "p1": [640, 640], "p2": [640, 0], "tex": 2, "portal": 0 },
-         { "p1": [640, 0], "p2": [1280, 0], "tex": 0, "portal": -1 },
-         { "p1": [1280, 0], "p2": [1280, 640], "tex": 0, "portal": -1 },
-         { "p1": [1280, 640], "p2": [640, 640], "tex": 0, "portal": -1 }
-       ]
-    }
-  ],
-  "entities": [
-    { "script": "scripts/test_ent.js", "pos": [320, 320, 64] }
-  ]
+    "points": [
+        [0, 0], [256, 0], [256, 64], [256, 192], [256, 256], [0, 256],
+        [512, 64], [512, 192],
+        [640, 64], [640, 192]
+    ],
+    "textures": [
+        { "id": 0, "path": "modern/inner_wall_1.png" },
+        { "id": 1, "path": "grid_blue.png" },
+        { "id": 2, "path": "modern/wood_0.png" }
+    ],
+    "sectors": [
+        {
+            "floor_height": 0.0,
+            "ceil_height": 128.0,
+            "floor_tex": 1,
+            "ceil_tex": 2,
+            "walls": [
+                { "p1": 0, "p2": 1, "tex": 0 },
+                { "p1": 1, "p2": 2, "tex": 0 },
+                { "p1": 2, "p2": 3, "portal": 1, "tex": 0 },
+                { "p1": 3, "p2": 4, "tex": 0 },
+                { "p1": 4, "p2": 5, "tex": 0 },
+                { "p1": 5, "p2": 0, "tex": 0 }
+            ]
+        },
+        {
+            "floor_height": 0.0,
+            "ceil_height": 128.0,
+            "floor_tex": 1,
+            "ceil_tex": 2,
+            "walls": [
+                { "p1": 2, "p2": 6, "tex": 0 },
+                { "p1": 6, "p2": 7, "portal": 2, "tex": 0 },
+                { "p1": 7, "p2": 3, "tex": 0 },
+                { "p1": 3, "p2": 2, "portal": 0, "tex": 0 }
+            ]
+        },
+        {
+            "floor_height": 32.0,
+            "ceil_height": 160.0,
+            "floor_tex": 1,
+            "ceil_tex": 2,
+            "walls": [
+                { "p1": 6, "p2": 8, "tex": 0 },
+                { "p1": 8, "p2": 9, "tex": 0 },
+                { "p1": 9, "p2": 7, "tex": 0 },
+                { "p1": 7, "p2": 6, "portal": 1, "tex": 0 }
+            ]
+        }
+    ],
+    "entities": [
+        { "script": "test_ent.js", "pos": [300, 128, 32] }
+    ]
 }

@@ -152,9 +152,19 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
         WallID wid = sector->first_wall + w;
         Wall* wall = &map->walls[wid];
         
+        // Lookup vertex coordinates
+        Vec2 p1 = map->points[wall->p1];
+        Vec2 p2 = map->points[wall->p2];
+        
         // 1. Transform & Clip
-        Vec3 p1_world = { wall->p2.x, wall->p2.y, 0 }; 
-        Vec3 p2_world = { wall->p1.x, wall->p1.y, 0 };
+        Vec3 p1_world = { p2.x, p2.y, 0 }; // Swapped for winding order? Or just p2->p1 convention?
+        Vec3 p2_world = { p1.x, p1.y, 0 }; // Usually sectors are CW or CCW. 
+        // Original code had p2.x, p2.y then p1.x, p1.y. Let's maintain that.
+        // It implies the wall goes from p1 to p2, but rendering iterates differently or transforms require it?
+        // Wait, normally transforming a segment (x1,y1) -> (x2,y2).
+        // If the original code swapped them, I will keep swapping them unless I see a reason not to.
+        // Original: p1_world = { wall->p2.x ... }; p2_world = { wall->p1.x ... }
+        // So yes, swapped.
         
         f32 dx = p2_world.x - p1_world.x;
         f32 dy = p2_world.y - p1_world.y;
@@ -390,10 +400,13 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
     for (int i = 0; i < map->wall_count; ++i) {
         Wall* wall = &map->walls[i];
         
-        float x1 = cx + (wall->p1.x - cam.pos.x) * zoom;
-        float y1 = cy - (wall->p1.y - cam.pos.y) * zoom;
-        float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
-        float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
+        Vec2 p1 = map->points[wall->p1];
+        Vec2 p2 = map->points[wall->p2];
+        
+        float x1 = cx + (p1.x - cam.pos.x) * zoom;
+        float y1 = cy - (p1.y - cam.pos.y) * zoom;
+        float x2 = cx + (p2.x - cam.pos.x) * zoom;
+        float y2 = cy - (p2.y - cam.pos.y) * zoom;
         
         Color col;
         if (wall->next_sector != -1) {
@@ -411,10 +424,13 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
          
          for (u32 i = 0; i < s->num_walls; ++i) {
             Wall* wall = &map->walls[s->first_wall + i];
-            float x1 = cx + (wall->p1.x - cam.pos.x) * zoom;
-            float y1 = cy - (wall->p1.y - cam.pos.y) * zoom;
-            float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
-            float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
+            Vec2 p1 = map->points[wall->p1];
+            Vec2 p2 = map->points[wall->p2];
+            
+            float x1 = cx + (p1.x - cam.pos.x) * zoom;
+            float y1 = cy - (p1.y - cam.pos.y) * zoom;
+            float x2 = cx + (p2.x - cam.pos.x) * zoom;
+            float y2 = cy - (p2.y - cam.pos.y) * zoom;
             
             DrawLineV((Vector2){x1, y1}, (Vector2){x2, y2}, h_col);
             
@@ -437,10 +453,14 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
         
         for (u32 i = 0; i < s->num_walls; ++i) {
             Wall* wall = &map->walls[s->first_wall + i];
-            float x1 = cx + (wall->p1.x - cam.pos.x) * zoom;
-            float y1 = cy - (wall->p1.y - cam.pos.y) * zoom;
-            float x2 = cx + (wall->p2.x - cam.pos.x) * zoom;
-            float y2 = cy - (wall->p2.y - cam.pos.y) * zoom;
+            
+            Vec2 p1 = map->points[wall->p1];
+            Vec2 p2 = map->points[wall->p2];
+            
+            float x1 = cx + (p1.x - cam.pos.x) * zoom;
+            float y1 = cy - (p1.y - cam.pos.y) * zoom;
+            float x2 = cx + (p2.x - cam.pos.x) * zoom;
+            float y2 = cy - (p2.y - cam.pos.y) * zoom;
             
             // Highlight Logic for Walls
             Color w_col;

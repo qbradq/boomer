@@ -80,10 +80,36 @@ bool Map_Load(const char* path, Map* out_map) {
     if (JS_IsException(val)) {
         printf("Map_Load: JSON Parse Error in '%s'\n", path);
         JSValue ex = JS_GetException(ctx);
-        // Print exception details if needed
         JS_FreeValue(ctx, ex);
         return false;
     }
+    
+    // 0. Load Points
+    JSValue points = JS_GetPropertyStr(ctx, val, "points");
+    if (JS_IsArray(points)) {
+        JSValue len_val = JS_GetPropertyStr(ctx, points, "length");
+        int point_count = 0;
+        JS_ToInt32(ctx, &point_count, len_val);
+        JS_FreeValue(ctx, len_val);
+        
+        if (point_count > 0) {
+            out_map->point_count = point_count;
+            out_map->points = (Vec2*)malloc(sizeof(Vec2) * point_count);
+            for(int i = 0; i < point_count; ++i) {
+                JSValue p_val = JS_GetPropertyUint32(ctx, points, i);
+                out_map->points[i] = GetVec2(ctx, p_val);
+                JS_FreeValue(ctx, p_val);
+            }
+        }
+    } else {
+        // Fallback for old maps or if missing: 
+        // We'll allocate points dynamically if needed, but for now strict.
+        printf("Map_Load: 'points' array missing in JSON.\n");
+        out_map->point_count = 0;
+        out_map->points = NULL;
+    }
+    JS_FreeValue(ctx, points);
+
     
     // 1. Load Textures
     JSValue textures = JS_GetPropertyStr(ctx, val, "textures");
@@ -99,13 +125,6 @@ bool Map_Load(const char* path, Map* out_map) {
         if (length > 0) {
             global_tex_ids = (TextureID*)malloc(sizeof(TextureID) * length);
             tex_count = length;
-            
-            // Assume we can just iterate 0..length-1
-            // But JSON IDs might be specified. The Plan said "Use the ID from JSON as the internal ID" 
-            // OR "Map it".
-            // Let's assume the JSON array index IS the local ID to simplify:
-            // "textures": [ { "id": 0 ... }, { "id": 1 ... } ]
-            // We just iterate array indices.
             
             for (int i = 0; i < length; ++i) {
                 JSValue item = JS_GetPropertyUint32(ctx, textures, i);
@@ -173,7 +192,6 @@ bool Map_Load(const char* path, Map* out_map) {
                 int f_tid = GetInt(ctx, s_obj, "floor_tex", -1);
                 int c_tid = GetInt(ctx, s_obj, "ceil_tex", -1);
                 
-                // Map IDs
                 sec->floor_tex_id = (f_tid >= 0 && f_tid < tex_count) ? global_tex_ids[f_tid] : -1;
                 sec->ceil_tex_id = (c_tid >= 0 && c_tid < tex_count) ? global_tex_ids[c_tid] : -1;
                 
@@ -191,23 +209,14 @@ bool Map_Load(const char* path, Map* out_map) {
                     JSValue w_obj = JS_GetPropertyUint32(ctx, w_arr, w);
                     Wall* wall = &out_map->walls[current_wall_idx + w];
                     
-                    JSValue p1v = JS_GetPropertyStr(ctx, w_obj, "p1");
-                    JSValue p2v = JS_GetPropertyStr(ctx, w_obj, "p2");
-                    wall->p1 = GetVec2(ctx, p1v);
-                    wall->p2 = GetVec2(ctx, p2v);
-                    JS_FreeValue(ctx, p1v);
-                    JS_FreeValue(ctx, p2v);
+                    wall->p1 = GetInt(ctx, w_obj, "p1", -1);
+                    wall->p2 = GetInt(ctx, w_obj, "p2", -1);
                     
                     wall->next_sector = GetInt(ctx, w_obj, "portal", -1);
                     
-                    // Texture mapping
                     int tid = GetInt(ctx, w_obj, "tex", -1);
                     wall->texture_id = (tid >= 0 && tid < tex_count) ? global_tex_ids[tid] : -1;
                     
-                    // For now, assume single texture prop maps to Mid (Main)
-                    // If JSON had top/bottom, we'd map them too.
-                    // Let's assume if portal != -1, use same tex for top/bot by default or allow overrides?
-                    // The example JSON just has "tex". 
                     wall->top_texture_id = wall->texture_id;
                     wall->bottom_texture_id = wall->texture_id;
                     
@@ -254,6 +263,6 @@ bool Map_Load(const char* path, Map* out_map) {
     if (global_tex_ids) free(global_tex_ids);
     JS_FreeValue(ctx, val);
     
-    printf("Map_Load: Loaded '%s' (%d sectors, %d walls)\n", path, out_map->sector_count, out_map->wall_count);
+    printf("Map_Load: Loaded '%s' (%d points, %d sectors, %d walls)\n", path, out_map->point_count, out_map->sector_count, out_map->wall_count);
     return true;
 }

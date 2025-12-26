@@ -6,9 +6,10 @@
 // Index into array, -1 if invalid/none
 typedef i32 SectorID;
 typedef i32 WallID;
+typedef i32 PointID;
 
 typedef struct {
-    Vec2 p1, p2;
+    PointID p1, p2;
     SectorID next_sector; // -1 if solid
     i32 texture_id; // Main wall texture
     i32 top_texture_id; // Wall above portal
@@ -31,6 +32,9 @@ typedef struct {
 } Sector;
 
 typedef struct Map {
+    Vec2*   points;
+    u32     point_count;
+    
     Wall*   walls;
     u32     wall_count;
     
