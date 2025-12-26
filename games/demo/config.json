@@ -7,7 +7,7 @@
     "logical_resolution": [320, 180],
     "console_background": "#1A1932",
     "console_text_color": "#FFFFFF",
-    "console_font": "fonts/Unitblock.ttf",
+    "console_font": "fonts/PixelOperator8.ttf",
     "console_font_size": 8,
     "window_size": 4,
     "fullscreen": false

@@ -1,5 +1,6 @@
 #include "console.h"
 #include "../core/config.h"
+#include "../core/fs.h"
 #include <raylib.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -57,11 +58,21 @@ bool Console_Init(void) {
     console.target = LoadRenderTexture(console.width, console.height);
     
     const GameConfig* cfg = Config_Get();
-    // Try to load configured font
-    if (FileExists(cfg->console_font_path)) {
-        console.font = LoadFontEx(cfg->console_font_path, cfg->console_font_size, NULL, 0);
+    // Try to load configured font via FS
+    size_t font_size = 0;
+    void* font_data = FS_ReadFile(cfg->console_font_path, &font_size);
+    
+    if (font_data) {
+        // We need extension for LoadFontFromMemory
+        const char* ext = GetFileExtension(cfg->console_font_path);
+        console.font = LoadFontFromMemory(ext, (const unsigned char*)font_data, (int)font_size, cfg->console_font_size, NULL, 0);
+        
+        // Disable filtering for sharp text
+        SetTextureFilter(console.font.texture, TEXTURE_FILTER_POINT);
+        
+        FS_FreeFile(font_data);
     } else {
-        printf("Console: Font '%s' not found, using default.\n", cfg->console_font_path);
+        printf("Console: Font '%s' not found in FS, using default.\n", cfg->console_font_path);
         console.font = GetFontDefault();
     }
     
