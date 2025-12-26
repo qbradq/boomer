@@ -1,26 +1,15 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Debug (Dev)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/dev/boomer",  // Replace with your executable name
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "preLaunchTask": "CMake: build-dev",
-            "miDebuggerPath": "gdb"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug (Dev)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev/boomer",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "preLaunchTask": "CMake: build-dev"
+    }
+  ]
 }

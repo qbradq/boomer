@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "language-server": {
+      "command": "mcp-language-server",
+      "args": [
+        "--workspace",
+        "/home/qbradq/projects/boomer",
+        "--lsp",
+        "/home/qbradq/.local/bin/clangd",
+        "--",
+        "--compile-commands-dir=/home/qbradq/projects/boomer/build/dev"
+      ]
+    }
+  }
+}

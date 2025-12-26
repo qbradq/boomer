@@ -124,9 +124,9 @@ static void DrawFlat(int x, int y1, int y2, f32 height_diff, GameCamera cam, Gam
         f32 wx = cam.pos.x + rdx * z;
         f32 wy = cam.pos.y + rdy * z;
         
-        // Texture Coords (1 unit = 64 pixels)
-        int tx = (int)(wx * 64.0f) % tex->width;
-        int ty = (int)(wy * 64.0f) % tex->height;
+        // Texture Coords (1 unit = 1 pixel)
+        int tx = (int)(wx) % tex->width;
+        int ty = (int)(wy) % tex->height;
         if (tx < 0) tx += tex->width;
         if (ty < 0) ty += tex->height;
         
@@ -197,7 +197,7 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
         f32 iz1 = 1.0f / c1.x;
         f32 iz2 = 1.0f / c2.x;
         
-        f32 u_scale = wall_len * 64.0f;
+        f32 u_scale = wall_len;
         f32 u1 = t1_clip * u_scale;
         f32 u2 = t2_clip * u_scale;
         
@@ -265,7 +265,7 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
                         int tex_x = (int)(uz / iz);
                         
                         f32 world_h = (sector->ceil_height - next_s->ceil_height);
-                        f32 v_scale = world_h * 64.0f;
+                        f32 v_scale = world_h;
                         float pixel_h = ny_ceil_f - y_ceil_f;
                         float v_s = v_scale / pixel_h;
                         
@@ -286,7 +286,7 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
                         int tex_x = (int)(uz / iz);
                         
                         f32 world_h = (next_s->floor_height - sector->floor_height);
-                        f32 v_scale = world_h * 64.0f;
+                        f32 v_scale = world_h;
                         float pixel_h = y_floor_f - ny_floor_f;
                         float v_s = v_scale / pixel_h;
                         
@@ -313,7 +313,7 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
                         int tex_x = (int)(uz / iz);
                         
                         f32 world_height = sector->ceil_height - sector->floor_height;
-                        float v_scale = world_height * 64.0f;
+                        float v_scale = world_height;
                         float height = y_floor_f - y_ceil_f;
                         float v_step = v_scale / height;
                         

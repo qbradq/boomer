@@ -61,30 +61,30 @@ static TextureID tex_wood;
 // World Data
 static Wall walls[] = {
     // Sector 0 (0-5)
-    { {0, 0}, {4, 0}, -1, 0, -1, -1 }, // TexIDs set in Init
-    { {4, 0}, {4, 1}, -1, 0, -1, -1 },
-    { {4, 1}, {4, 3},  1, -1, 0, 0 }, // P->1
-    { {4, 3}, {4, 4}, -1, 0, -1, -1 },
-    { {4, 4}, {0, 4}, -1, 0, -1, -1 },
-    { {0, 4}, {0, 0}, -1, 0, -1, -1 },
+    { {0, 0}, {256, 0}, -1, 0, -1, -1 }, // TexIDs set in Init
+    { {256, 0}, {256, 64}, -1, 0, -1, -1 },
+    { {256, 64}, {256, 192},  1, -1, 0, 0 }, // P->1
+    { {256, 192}, {256, 256}, -1, 0, -1, -1 },
+    { {256, 256}, {0, 256}, -1, 0, -1, -1 },
+    { {0, 256}, {0, 0}, -1, 0, -1, -1 },
     
     // Sector 1 (6-11)
-    { {4, 1}, {8, 1}, -1, 0, -1, -1 }, // Top wall
-    { {8, 1}, {8, 3},  2, -1, 0, 0 }, // P->2 (East)
-    { {8, 3}, {4, 3}, -1, 0, -1, -1 }, // Bottom wall
-    { {4, 3}, {4, 1},  0, -1, 0, 0 }, // P->0 (West)
+    { {256, 64}, {512, 64}, -1, 0, -1, -1 }, // Top wall
+    { {512, 64}, {512, 192},  2, -1, 0, 0 }, // P->2 (East)
+    { {512, 192}, {256, 192}, -1, 0, -1, -1 }, // Bottom wall
+    { {256, 192}, {256, 64},  0, -1, 0, 0 }, // P->0 (West)
     
     // Sector 2 (10-13) - Let's make it a small room
-    { {8, 1}, {10, 1}, -1, 0, -1, -1 },
-    { {10, 1}, {10, 3}, -1, 0, -1, -1 },
-    { {10, 3}, {8, 3}, -1, 0, -1, -1 },
-    { {8, 3}, {8, 1},  1, -1, 0, 0 } // P->1
+    { {512, 64}, {640, 64}, -1, 0, -1, -1 },
+    { {640, 64}, {640, 192}, -1, 0, -1, -1 },
+    { {640, 192}, {512, 192}, -1, 0, -1, -1 },
+    { {512, 192}, {512, 64},  1, -1, 0, 0 } // P->1
 };
 
 static Sector sectors[] = {
-    { 0.0f, 2.0f, 0, 6, 0, 0 }, // S0
-    { 0.0f, 2.0f, 6, 4, 0, 0 }, // S1
-    { 0.5f, 2.5f, 10, 4, 0, 0 } // S2 (Higher floor)
+    { 0.0f, 128.0f, 0, 6, 0, 0 }, // S0
+    { 0.0f, 128.0f, 6, 4, 0, 0 }, // S1
+    { 32.0f, 160.0f, 10, 4, 0, 0 } // S2 (Higher floor)
 };
 
 static Map map = {
@@ -95,7 +95,7 @@ static Map map = {
 };
 
 static GameCamera cam = {
-    .pos = {2.0f, 2.0f, 0.75f}, // Start inside Sector 0
+    .pos = {128.0f, 128.0f, 48.0f}, // Start inside Sector 0
     .yaw = 0.0f
 };
 
@@ -197,7 +197,7 @@ void Loop(void) {
     f32 dt = GetFrameTime();
     
     // Cam Update
-    f32 move_speed = 3.0f * dt;
+    f32 move_speed = 192.0f * dt;
     f32 rot_speed = 2.0f * dt;
     
     if (input.turn_left) cam.yaw += rot_speed;
@@ -240,7 +240,7 @@ void Loop(void) {
         } else {
              int w = GetScreenWidth();
              int h = GetScreenHeight();
-             Render_Map2D(&map, cam, 0, 0, w, h, 32.0f, 
+             Render_Map2D(&map, cam, 0, 0, w, h, 0.5f, 
                 Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), 
                 Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex()); 
         }
@@ -316,7 +316,7 @@ int main(int argc, char** argv) {
     JS_FreeValue(Script_GetContext(), mainScriptVal);
 
     // 4. Init Camera
-    cam.pos = (Vec3){2.0f, 2.0f, 1.5f};
+    cam.pos = (Vec3){128.0f, 128.0f, 96.0f};
 
     // 3. Game Loop
     

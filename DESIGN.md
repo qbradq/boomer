@@ -10,15 +10,8 @@ style) as a fun and expressive platform for making and sharing games.
 - **Target Platforms**: Windows, Linux, macOS, Web (Emscripten)
 - **Version Control**: Git / GitHub
 
-## Dependencies
-- **Windowing/Input**: SDL2
-- **Image Loading**: `stb_image`
-- **Audio Loading**: `stb_vorbis`
-- **Text Rendering**: `stb_truetype`
-- **Noise Generation**: `stb_perlin`
-
 ## Architecture
-- **Engine Style**: 2.5D (Sector-based, similar to Doom/Build)
+- **Engine Style**: 2.5D (Sector-based with portals, similar to Build)
 - **Philosophy**: Fun and expressive platform.
 
 ## World Representation
@@ -26,7 +19,7 @@ style) as a fun and expressive platform for making and sharing games.
 - **Verticality**: Room-over-room (ROR) support via portals.
 
 ## Coordinate System
-- **Units**: 1 unit equals 64 pixels.
+- **Units**: 1 unit equals 1 pixel.
 - **axes**: The positive Z axis points up.
 - **Math**: Floating point, 32-bit precision.
 
