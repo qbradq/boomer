@@ -6,11 +6,10 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include "../video/video.h"
+
 #define MAX_LOG_LINES 128
 #define MAX_LINE_LEN 256
-
-#define CONSOLE_HEIGHT 720
-#define CONSOLE_WIDTH 1280
 
 typedef enum {
     CONSOLE_HIDDEN,
@@ -20,6 +19,8 @@ typedef enum {
 
 static struct {
     RenderTexture2D target;
+    int width;
+    int height;
     Font font;
     
     ConsoleState state;
@@ -51,7 +52,9 @@ static Color Console_GetColor(u32 hex) {
 }
 
 bool Console_Init(void) {
-    console.target = LoadRenderTexture(CONSOLE_WIDTH, CONSOLE_HEIGHT);
+    console.width = VIDEO_WIDTH * 2;
+    console.height = VIDEO_HEIGHT * 2;
+    console.target = LoadRenderTexture(console.width, console.height);
     
     const GameConfig* cfg = Config_Get();
     // Try to load configured font
@@ -134,7 +137,7 @@ void Console_Draw(void) {
     Color bg = Console_GetColor(cfg->console_bg_color);
     Color txt_col = Console_GetColor(cfg->console_text_color);
     
-    int visible_h = (int)(CONSOLE_HEIGHT * console.anim_t);
+    int visible_h = (int)(console.height * console.anim_t);
     
     BeginTextureMode(console.target);
         ClearBackground(BLANK); // Clear to transparent
@@ -147,7 +150,7 @@ void Console_Draw(void) {
         // then draw the texture with a source/dest rect in end.
         
         // Fill background
-        DrawRectangle(0, 0, CONSOLE_WIDTH, visible_h, bg);
+        DrawRectangle(0, 0, console.width, visible_h, bg);
     
         // Draw Text
         // Draw from log_head backwards, starting from bottom of visible area
@@ -180,7 +183,7 @@ void Console_Draw(void) {
     // Dest: 0, 0, sw, sh
     
     DrawTexturePro(console.target.texture, 
-        (Rectangle){0, 0, (float)CONSOLE_WIDTH, (float)-CONSOLE_HEIGHT}, 
+        (Rectangle){0, 0, (float)console.width, (float)-console.height}, 
         (Rectangle){0, 0, sw, sh}, 
         (Vector2){0, 0}, 0.0f, WHITE);
 }
