@@ -109,6 +109,7 @@ static JSValue js_load_map_wrapper(JSContext *ctx, JSValueConst this_val, int ar
     
     if (res) {
         Console_SetMapLoaded(true);
+        Console_Close(); // Auto-hide console
         // Reset camera if needed? Or controlled by script?
         // For now, let's just say success.
         printf("Map Loaded via script.\n");
@@ -171,9 +172,12 @@ void Loop(void) {
     if (IsKeyPressed(KEY_F10)) {
         Video_ToggleFullscreen();
     }
-    if (IsKeyPressed(KEY_ESCAPE)) {
-        running = false;
+    if (IsKeyPressed(KEY_F10)) {
+        Video_ToggleFullscreen();
     }
+    // if (IsKeyPressed(KEY_ESCAPE)) {
+    //    running = false;
+    // }
     
     // Game Input Handling
     if (!Editor_IsActive() && !Console_IsActive()) {

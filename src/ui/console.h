@@ -10,6 +10,9 @@ bool Console_Init(void);
 // Shutdown console
 void Console_Shutdown(void);
 
+// Close the console (force hidden)
+void Console_Close(void);
+
 // Log message
 void Console_Log(const char* fmt, ...);
 

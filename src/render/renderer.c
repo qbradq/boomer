@@ -48,15 +48,15 @@ bool WorldToScreen(Vec3 world_pos, GameCamera cam, Vec2* screen_out) {
     return true;
 }
 
-// Clip a wall segment against the Near Plane (p.x > NEAR_Z)
+// Clip a wall segment against the Near Plane (p.x > near_z)
 // Returns t1, t2 (0.0 to 1.0) relative to original segment
-static bool ClipWall(Vec3 p1, Vec3 p2, Vec3* out1, Vec3* out2, f32* t1, f32* t2) {
+static bool ClipWall(Vec3 p1, Vec3 p2, Vec3* out1, Vec3* out2, f32* t1, f32* t2, f32 near_z) {
     *out1 = p1;
     *out2 = p2;
     *t1 = 0.0f;
     *t2 = 1.0f;
     
-    f32 n = NEAR_Z;
+    f32 n = near_z;
     
     if (p1.x < n && p2.x < n) return false;
     if (p1.x >= n && p2.x >= n) return true;
@@ -165,7 +165,10 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
         
         Vec3 c1, c2;
         f32 t1_clip, t2_clip;
-        if (!ClipWall(p1_cam, p2_cam, &c1, &c2, &t1_clip, &t2_clip)) continue;
+        bool portal = (wall->next_sector != -1);
+        f32 clip_dist = portal ? 0.005f : NEAR_Z; // Use closer clip for portals to prevent blinking
+
+        if (!ClipWall(p1_cam, p2_cam, &c1, &c2, &t1_clip, &t2_clip, clip_dist)) continue;
         
         // 2. Project X
         f32 x1 = center_x + (c1.y / c1.x) * scale;
@@ -205,8 +208,6 @@ static void RenderSector(Map* map, GameCamera cam, SectorID sector_id, int min_x
         // Preparing next recursion buffers if portal
         i16 next_y_top[MAX_VIDEO_WIDTH];
         i16 next_y_bot[MAX_VIDEO_WIDTH];
-        bool portal = (wall->next_sector != -1);
-        
         // 6. Draw Columns
         for (int x = draw_x1; x < draw_x2; ++x) {
             f32 t_screen = (x - x1) / (x2 - x1);

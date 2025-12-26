@@ -88,6 +88,11 @@ void Console_Shutdown(void) {
     if (console.font.texture.id != 0) UnloadFont(console.font);
 }
 
+void Console_Close(void) {
+    console.state = CONSOLE_HIDDEN;
+    console.target_t = 0.0f;
+}
+
 void Console_Log(const char* fmt, ...) {
     char buf[MAX_LINE_LEN];
     va_list args;
