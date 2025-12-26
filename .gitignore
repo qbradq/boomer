@@ -76,6 +76,7 @@ CMakeUserPresets.json
 PROMPT.md
 /PROMPT.*.md
 PROMPT.*.md
+/PLAN.md
 
 # Application output data
 /data

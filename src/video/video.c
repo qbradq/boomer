@@ -51,13 +51,14 @@ bool Video_Init(const char* title) {
     int height = VIDEO_HEIGHT * current_scale;
     
     InitWindow(width, height, title);
+    SetExitKey(0);
     
     if (!IsWindowReady()) {
         printf("Video: Raylib InitWindow failed.\n");
         return false;
     }
-    
-    // Create a texture to dump our framebuffer into
+
+
     // Raylib LoadTextureFromImage requires an Image.
     // We'll create a blank image first or just create texture entirely?
     // GenTexture is not exposed directly for empty.

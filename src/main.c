@@ -14,42 +14,21 @@
 #include "world/map_loader.h"
 #include "core/fs.h"
 #include "core/script_sys.h"
-#include "core/config.h"      // Added
+#include "core/config.h"
 #include "game/entity.h"
 #include "editor/editor.h"
-#include "ui/console.h"       // Added
+#include "ui/console.h"
 
-// JS Binding for Map Loading
-static JSValue js_load_map(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-    if (argc < 1) return JS_EXCEPTION;
-    const char* filename = JS_ToCString(ctx, argv[0]);
-    if (!filename) return JS_EXCEPTION;
-    
-    printf("JS Request: Load Map '%s'\n", filename);
-    
-    // We need access to the global 'map' variable.
-    // Since 'map' is static in main.c, we can access it if we put this function in main.c
-    // But we need to forward declare 'map' or move this function after map definition.
-    // map is defined below. We'll move this function or use a forward declaration or helper.
-    // Let's implement a wrapper `Game_LoadMap` in main? 
-    // Or just putting `map` at top scope is cleaner.
-    // For now, I will use a forward decl of the helper and implement it after `map` is defined.
-    // But this is inside main.c
-    
-    // Actually, I can just put this binding function AFTER `map` definition.
-    // See below chunks.
-    return JS_UNDEFINED;
-}
-
+// --- Global State for Main Loop ---
+static bool running = true;
 
 typedef struct {
     bool forward, backward, left, right;
     bool turn_left, turn_right;
-    bool u, d;
+    bool fly_up, fly_down;
+    bool sprint;
 } InputState;
 
-// --- Global State for Main Loop ---
-static bool running = true;
 static InputState input = {false};
 static bool editor_has_focus = false;
 
@@ -110,8 +89,6 @@ static JSValue js_load_map_wrapper(JSContext *ctx, JSValueConst this_val, int ar
     if (res) {
         Console_SetMapLoaded(true);
         Console_Close(); // Auto-hide console
-        // Reset camera if needed? Or controlled by script?
-        // For now, let's just say success.
         printf("Map Loaded via script.\n");
     } else {
         printf("Failed to load map '%s' via script.\n", filename);
@@ -120,7 +97,6 @@ static JSValue js_load_map_wrapper(JSContext *ctx, JSValueConst this_val, int ar
     JS_FreeCString(ctx, filename);
     return JS_NewBool(ctx, res);
 }
-
 
 // --- Loop Function ---
 void Loop(void) {
@@ -132,20 +108,12 @@ void Loop(void) {
         return;
     }
 
-    // Input Poll - Handled by Raylib
-    
     // Console Input
     if (Console_HandleEvent()) {
-        // If console consumed event (e.g. toggle), we might want to skip other inputs?
-        // But Console_HandleEvent currently only handles Toggle.
-        // If console is Full/Half, maybe block game input?
         if (Console_IsActive()) {
              // Block Game Input
-             // But we still process F-keys?
-             // Let's allow F-keys for now.
         }
     }
-
 
     // Global Toggles
     if (IsKeyPressed(KEY_F12)) {
@@ -172,32 +140,34 @@ void Loop(void) {
     if (IsKeyPressed(KEY_F10)) {
         Video_ToggleFullscreen();
     }
-    if (IsKeyPressed(KEY_F10)) {
-        Video_ToggleFullscreen();
-    }
-    // if (IsKeyPressed(KEY_ESCAPE)) {
-    //    running = false;
-    // }
     
     // Game Input Handling
     if (!Editor_IsActive() && !Console_IsActive()) {
-
-        input.forward = IsKeyDown(KEY_W);
-        input.backward = IsKeyDown(KEY_S);
-        input.left = IsKeyDown(KEY_A); 
-        input.right = IsKeyDown(KEY_D); 
-        input.turn_left = IsKeyDown(KEY_LEFT);
-        input.turn_right = IsKeyDown(KEY_RIGHT);
-        input.u = IsKeyDown(KEY_Q);
-        input.d = IsKeyDown(KEY_E);
+        input.forward = Config_IsActionDown("move_forward");
+        input.backward = Config_IsActionDown("move_backward");
+        input.left = Config_IsActionDown("strafe_left");
+        input.right = Config_IsActionDown("strafe_right");
+        input.turn_left = Config_IsActionDown("turn_left");
+        input.turn_right = Config_IsActionDown("turn_right");
+        input.fly_up = Config_IsActionDown("fly_up");
+        input.fly_down = Config_IsActionDown("fly_down");
+        input.sprint = Config_IsActionDown("sprint");
+        
+        if (Config_IsActionPressed("game_menu")) {
+            printf("Game Menu (Stub)\n");
+        }
+    } else if (Editor_IsActive()) {
+         if (Config_IsActionPressed("editor_zoom_in")) printf("Editor Zoom In (Stub)\n");
+         if (Config_IsActionPressed("editor_zoom_out")) printf("Editor Zoom Out (Stub)\n");
     } else {
-            input = (InputState){0};
+        input = (InputState){0};
     }
 
     f32 dt = GetFrameTime();
     
     // Cam Update
     f32 move_speed = 192.0f * dt;
+    if (input.sprint) move_speed *= 2.5f;
     f32 rot_speed = 2.0f * dt;
     
     if (input.turn_left) cam.yaw += rot_speed;
@@ -222,8 +192,8 @@ void Loop(void) {
         cam.pos.x += sn * move_speed;
         cam.pos.y -= cs * move_speed;
     }
-    if (input.u) cam.pos.z += move_speed;
-    if (input.d) cam.pos.z -= move_speed;
+    if (input.fly_up) cam.pos.z += move_speed;
+    if (input.fly_down) cam.pos.z -= move_speed;
     
     Entity_Update(dt);
 
@@ -231,7 +201,6 @@ void Loop(void) {
     Video_BeginFrame();
     
     if (Editor_IsActive()) {
-        // ... (Editor rendering kept same)
         Editor_Update(&map, &cam);
         int view = Editor_GetViewMode();
         if (view == 0) {
@@ -308,9 +277,6 @@ int main(int argc, char** argv) {
     Renderer_Init();
     Texture_Init();
 
-    // 2. Load Map (Via Script now)
-    // if( !Map_Load("test.json", &map) ) ... REMOVED hardcoded load
-
     // 2.5 Run Main Script
     JSValue mainScriptVal = Script_EvalFile("scripts/main.js");
     JS_FreeValue(Script_GetContext(), mainScriptVal);
@@ -319,13 +285,15 @@ int main(int argc, char** argv) {
     cam.pos = (Vec3){128.0f, 128.0f, 96.0f};
 
     // 3. Game Loop
-    
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(Loop, 0, 1);
 #else
     while (running && !WindowShouldClose()) {
         Loop();
     }
+    
+    // Save Config on Exit
+    Config_Save();
     
     Console_Shutdown();
     Editor_Shutdown();
@@ -335,7 +303,6 @@ int main(int argc, char** argv) {
     Script_Shutdown();
     FS_Shutdown();
 #endif
-
 
     return 0;
 }

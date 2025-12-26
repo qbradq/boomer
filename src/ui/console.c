@@ -107,7 +107,9 @@ void Console_Log(const char* fmt, ...) {
 }
 
 bool Console_HandleEvent(void) {
-    if (IsKeyPressed(KEY_GRAVE)) { // Tilde / Backquote
+    if (Config_IsActionPressed("toggle_console")) { // Configured key
+        // Toggle Logic
+
         // Toggle Logic
         if (!g_map_loaded) {
             // Cannot dismiss if no map

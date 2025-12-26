@@ -10,5 +10,20 @@
     "console_font": "fonts/PixelOperator8.ttf",
     "console_font_size": 8,
     "window_size": 4,
-    "fullscreen": false
+    "fullscreen": false,
+    "input": {
+        "move_forward": ["W", "UP"],
+        "move_backward": ["S", "DOWN"],
+        "strafe_left": "A",
+        "strafe_right": "D",
+        "turn_left": "LEFT",
+        "turn_right": "RIGHT",
+        "fly_up": "SPACE",
+        "fly_down": "LEFT_CONTROL",
+        "sprint": "LEFT_SHIFT",
+        "toggle_console": "GRAVE",
+        "game_menu": "ESCAPE",
+        "editor_zoom_in": "EQUAL",
+        "editor_zoom_out": "MINUS"
+    }
 }

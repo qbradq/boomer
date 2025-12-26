@@ -18,9 +18,17 @@ typedef struct {
 } GameConfig;
 
 // Loads config from fs.
+// Loads config from fs.
 // 1. Loads base_path/config.json
 // 2. Loads user_data/config.json (overrides)
-bool Config_Load();
+bool Config_Load(void);
+
+// Saves current config (including input map) to user_data/config.json
+void Config_Save(void);
+
+// Input System
+bool Config_IsActionDown(const char* action);
+bool Config_IsActionPressed(const char* action);
 
 // Get global config
 const GameConfig* Config_Get(void);
