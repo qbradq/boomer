@@ -2,6 +2,10 @@
 #include "raylib.h"
 #include "raygui.h"
 #include <stdio.h>
+#include <math.h>
+#include "../world/world_types.h"
+#include "../game/entity.h"
+#include "../render/renderer.h"
 
 #define TOOLBAR_HEIGHT 40
 #define STATUSBAR_HEIGHT 24
@@ -30,6 +34,9 @@ static bool view_3d = true;
 
 static SelectionType sel_type = SEL_NONE;
 static int sel_id = -1;
+static int hovered_sector = -1;
+static int hovered_wall = -1;
+static int hovered_entity = -1;
 
 // Layout
 Rectangle GetGameViewRect(void) {
@@ -67,9 +74,197 @@ bool Editor_HandleInput(void) {
     return false;
 }
 
+
+// Helper for distance point->line segment
+static float DistToLine(Vector2 p, Vector2 l1, Vector2 l2) {
+    float l2_sq = (l2.x - l1.x)*(l2.x - l1.x) + (l2.y - l1.y)*(l2.y - l1.y);
+    if (l2_sq == 0) return sqrtf((p.x - l1.x)*(p.x - l1.x) + (p.y - l1.y)*(p.y - l1.y));
+    
+    // t = [(p - l1) . (l2 - l1)] / |l2 - l1|^2
+    float t = ((p.x - l1.x)*(l2.x - l1.x) + (p.y - l1.y)*(l2.y - l1.y)) / l2_sq;
+    
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    
+    Vector2 proj = { l1.x + t * (l2.x - l1.x), l1.y + t * (l2.y - l1.y) };
+    return sqrtf((p.x - proj.x)*(p.x - proj.x) + (p.y - proj.y)*(p.y - proj.y));
+}
+
+// Check point in sector logic (simplified raycast or using GetSectorAt if reliable)
+// Using GetSectorAt from world logic is best, but let's re-verify it works for a given Point.
+// Assuming GetSectorAt works in world space.
+
 void Editor_Update(struct Map* map, struct GameCamera* cam) {
-    (void)map;
-    (void)cam;
+    // 0. Update Limits
+    if (zoom_level < 1.0f/32.0f) zoom_level = 1.0f/32.0f;
+    if (zoom_level > 32.0f) zoom_level = 32.0f;
+    
+    if (grid_size < 1) grid_size = 1;
+    if (grid_size > 1024) grid_size = 1024;
+
+    if (!is_active) return;
+    // if (editor_has_focus) return; // UI has focus - handled implicitly by raygui
+    
+    // Zoom control with Mouse Wheel
+    float wheel = GetMouseWheelMove();
+    if (wheel != 0) {
+        if (wheel > 0) zoom_level *= 2.0f;
+        else zoom_level /= 2.0f;
+    }
+
+    // World Mouse Pos
+    Rectangle game_rect = GetGameViewRect();
+    Vector2 mouse_s = GetMousePosition();
+    
+    // If outside view, ignore
+    if (!CheckCollisionPointRec(mouse_s, game_rect)) {
+        hovered_entity = -1;
+        hovered_wall = -1;
+        hovered_sector = -1;
+        return;
+    }
+    
+    // Calculate World Pos:
+    // ScreenX = cx + (WorldX - CamX) * Zoom
+    // WorldX = (ScreenX - cx) / Zoom + CamX
+    float cx = game_rect.x + game_rect.width / 2.0f;
+    float cy = game_rect.y + game_rect.height / 2.0f;
+    
+    // In Render_Map2D, we did:
+    // y_screen = cy - (y_world - cam.y) * zoom
+    // (y_screen - cy) / -zoom = y_world - cam.y
+    // y_world = cam.y - (y_screen - cy) / zoom
+    
+    float wx = (mouse_s.x - cx) / zoom_level + cam->pos.x;
+    float wy = cam->pos.y - (mouse_s.y - cy) / zoom_level;
+    
+    // 2D Grid Limit Check
+    // "Do not allow points to exceed this range in the editor."
+    // -32768 to 32768.
+    // We are not moving points yet, but if we were, we'd clamp wx/wy here.
+    
+    // Hover Logic
+    hovered_entity = -1;
+    hovered_wall = -1;
+    hovered_sector = -1;
+    
+    // 1. Entities (32x32 box)
+    int max_slots = Entity_GetMaxSlots();
+    for (int i = 0; i < max_slots; ++i) {
+        Entity* e = Entity_GetBySlot(i);
+        if (!e) continue;
+        
+        // Check AABB centered at e->pos
+        // Half size 16
+        if (wx >= e->pos.x - 16 && wx <= e->pos.x + 16 &&
+            wy >= e->pos.y - 16 && wy <= e->pos.y + 16) {
+            hovered_entity = e->id;
+            break; // First one on top?
+        }
+    }
+    
+    // 2. Walls (10px screen tolerance)
+    float screen_tol = 10.0f;
+    
+    if (hovered_entity == -1) {
+        for (int i = 0; i < (int)map->wall_count; ++i) {
+            Wall* w = &map->walls[i];
+            Vec2 p1 = map->points[w->p1];
+            Vec2 p2 = map->points[w->p2];
+            
+            // Project to Screen
+            float sx1 = cx + (p1.x - cam->pos.x) * zoom_level;
+            float sy1 = cy - (p1.y - cam->pos.y) * zoom_level;
+            float sx2 = cx + (p2.x - cam->pos.x) * zoom_level;
+            float sy2 = cy - (p2.y - cam->pos.y) * zoom_level;
+            
+            float screen_dist = DistToLine(mouse_s, (Vector2){sx1, sy1}, (Vector2){sx2, sy2});
+            
+            if (screen_dist <= screen_tol) {
+                // Special handling for Portals
+                if (w->next_sector != -1) {
+                    // Must be contained within the wall's sector.
+                    int owner_sec = -1;
+                    // Find owner sector
+                    for (int s=0; s<(int)map->sector_count; ++s) {
+                        if (i >= map->sectors[s].first_wall && i < (int)(map->sectors[s].first_wall + map->sectors[s].num_walls)) {
+                            owner_sec = s;
+                            break;
+                        }
+                    }
+                    if (owner_sec != -1) {
+                        if (GetSectorAt(map, (Vec2){wx, wy}) == owner_sec) {
+                             hovered_wall = i;
+                             break;
+                        }
+                    }
+                } else {
+                    hovered_wall = i;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // 3. Sectors
+    if (hovered_entity == -1 && hovered_wall == -1) {
+        // Point in sector
+        int sec = GetSectorAt(map, (Vec2){wx, wy});
+        if (sec != -1) {
+            hovered_sector = sec;
+        } else {
+            // OR within 10px of a non-portal wall of this sector.
+            // This implies we check walls again??
+            // "The cursor is hovering over a sector if: The cursor location is within the bounds ... OR the cursor location is within 10px of a non-portal wall of this sector."
+            // Checking dist to ALL non-portal walls:
+            // If we are close to a solid wall, we hover the wall (priority 2).
+            // But if we are close to a solid wall, we ALSO hover the sector?
+            // "Else, if we are hovering a wall, make the wall the current selection."
+            // So Wall > Sector.
+            // But the definition of Sector Hover includes being close to a wall.
+            // However, since we check Wall FIRST, and if found we set hovered_wall, 
+            // the Sector Logic (which is priority 3, "if hovered_entity == -1 && hovered_wall == -1") won't be reached if we are close to a wall.
+            // Wait. "The cursor is hovering over a sector if... Or within 10px of a non-portal wall".
+            // If I am within 10px of a non-portal wall, I am hovering the WALL (Priority 2).
+            // So I wouldn't reach Priority 3 logic.
+            // UNLESS "hovering a wall" check failed?
+            // "The cursor is hovering over a wall if ... within 10px"
+            // So if I am within 10px, I AM hovering a wall.
+            // So the second condition for sector hover is redundant if Wall Hover takes precedence?
+            // "Else, if we are hovering a wall, make the wall the current selection." -> This is CLICK logic.
+            // Hover logic (tracking) is "Track which sector the cursor is hovering over".
+            // PROMPT: "Track which wall... Track which sector..."
+            // It implies we can hover multiple things simultaneously?
+            // "On click: If we are hovering an entity... Else if wall... Else if sector..."
+            // This establishes hierarchy for SELECTION.
+            // But for RENDERING Highlight:
+            // "If there is a hovered entity: Draw entity... Else if hovered wall: Draw... Else if hovered sector..."
+            // So Hierarchy exists in Rendering too.
+            // So effectively, if we hover a wall, we effectively don't "need" to know if we hover the sector separately for rendering, 
+            // EXCEPT "Draw the sector of that wall in orange". This uses the wall's sector.
+            // But what if we hover a solid wall from the OUTSIDE? (Void).
+            // Walls are one-sided? PROMPT says "Draw the normal... pointing inward".
+            // Usually editors handle walls as belonging to the sector on the inside.
+            // So yes, checking GetSectorAt is mostly sufficient.
+        }
+    }
+    
+    // Click Handling
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (hovered_entity != -1) {
+            sel_type = SEL_ENTITY;
+            sel_id = hovered_entity;
+        } else if (hovered_wall != -1) {
+            sel_type = SEL_WALL;
+            sel_id = hovered_wall;
+        } else if (hovered_sector != -1) {
+            sel_type = SEL_SECTOR;
+            sel_id = hovered_sector;
+        } else {
+            sel_type = SEL_NONE;
+            sel_id = -1;
+        }
+    }
 }
 
 static void DrawToolbar(void) {
@@ -195,6 +390,11 @@ static void DrawStatusBar(void) {
     
     // Pos
     cur_x -= element_w;
+    // Show Screen Mouse? Or world mouse? Usually world.
+    // Need game camera and mouse pos to calc world.
+    // We don't have access to camera here directly easily without passing it or globals.
+    // Editor_Update usage of mouse_s logic is internal.
+    // Let's just show Mouse X/Y generic or leave 0,0 for now as proper calc requires state.
     GuiLabel((Rectangle){cur_x, bounds.y, element_w, bounds.height}, "POS: (0,0)");
     
     // Zoom
@@ -205,9 +405,25 @@ static void DrawStatusBar(void) {
     cur_x -= element_w;
     GuiLabel((Rectangle){cur_x, bounds.y, element_w, bounds.height}, TextFormat("GRID: %d", grid_size));
     
-    // File (Last element, remaining width)
-    float file_w = cur_x - bounds.x - 10;
-    GuiLabel((Rectangle){bounds.x + 10, bounds.y, file_w, bounds.height}, "FILE: maps/test.json");
+    // Selection Info (Status)
+    // "Add a statusbar element ... that displays what is selected."
+    // "For instance, if entity with ID 4 is selected, it should say "Entity 4""
+    float status_w = cur_x - bounds.x - 10;
+    const char* status_text = "No Selection";
+    static char buf[64];
+    
+    if (sel_type == SEL_ENTITY) {
+        snprintf(buf, 64, "Entity %d", sel_id);
+        status_text = buf;
+    } else if (sel_type == SEL_WALL) {
+        snprintf(buf, 64, "Wall %d", sel_id);
+        status_text = buf;
+    } else if (sel_type == SEL_SECTOR) {
+        snprintf(buf, 64, "Sector %d", sel_id);
+        status_text = buf;
+    }
+    
+    GuiLabel((Rectangle){bounds.x + 10, bounds.y, status_w, bounds.height}, status_text);
 }
 
 void Editor_Render(struct Map* map, struct GameCamera* cam) {
@@ -234,6 +450,14 @@ int Editor_GetViewMode(void) {
     return view_3d ? 0 : 1;
 }
 
+int Editor_GetHoveredWallIndex(void) {
+    return hovered_wall;
+}
+
+int Editor_GetHoveredSectorID(void) {
+    return hovered_sector;
+}
+
 int Editor_GetSelectedSectorID(void) {
     return (sel_type == SEL_SECTOR) ? sel_id : -1;
 }
@@ -242,10 +466,14 @@ int Editor_GetSelectedWallIndex(void) {
     return (sel_type == SEL_WALL) ? sel_id : -1;
 }
 
-int Editor_GetHoveredSectorID(void) {
-    return -1;
+int Editor_GetSelectedEntityID(void) {
+    return (sel_type == SEL_ENTITY) ? sel_id : -1;
 }
 
-int Editor_GetHoveredWallIndex(void) {
-    return -1;
+int Editor_GetHoveredEntityID(void) {
+    return hovered_entity;
+}
+
+float Editor_GetZoom(void) {
+    return zoom_level;
 }

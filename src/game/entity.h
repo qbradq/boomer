@@ -28,5 +28,7 @@ void Entity_Update(f32 dt);
 u32 Entity_Spawn(const char* script_path, Vec3 pos);
 
 Entity* Entity_Get(u32 id);
+Entity* Entity_GetBySlot(int slot);
+int Entity_GetMaxSlots(void);
 
 #endif // BOOMER_ENTITY_H

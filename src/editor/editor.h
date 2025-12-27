@@ -43,9 +43,17 @@ void Editor_Toggle(void);
 // Get Current View Mode (0 = 3D Game, 1 = 2D Map)
 int Editor_GetViewMode(void);
 
+// Get Current Zoom Level
+float Editor_GetZoom(void);
+
+
+
 int Editor_GetSelectedSectorID(void);
 int Editor_GetSelectedWallIndex(void);
 int Editor_GetHoveredSectorID(void);
 int Editor_GetHoveredWallIndex(void);
+int Editor_GetSelectedEntityID(void);
+int Editor_GetHoveredEntityID(void);
 
 #endif
+

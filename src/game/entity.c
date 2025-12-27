@@ -92,6 +92,16 @@ Entity* Entity_Get(u32 id) {
     return NULL;
 }
 
+Entity* Entity_GetBySlot(int slot) {
+    if (slot < 0 || slot >= MAX_ENTITIES) return NULL;
+    if (!g_entities[slot].active) return NULL;
+    return &g_entities[slot];
+}
+
+int Entity_GetMaxSlots(void) {
+    return MAX_ENTITIES;
+}
+
 u32 Entity_Spawn(const char* script_path, Vec3 pos) {
     // Find free slot
     int slot = -1;

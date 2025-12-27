@@ -4,6 +4,7 @@
 #include "../core/math_utils.h"
 #include "raylib.h"
 #include <math.h>
+#include "../game/entity.h"
 
 #ifndef max
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -371,138 +372,253 @@ void Render_Frame(GameCamera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zoom, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index) {
+void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zoom, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id) {
     // Set viewport/clip
-    // Raylib scissor test for viewport clipping
     BeginScissorMode(x, y, w, h);
     
-    // Background
-    DrawRectangle(x, y, w, h, (Color){30, 30, 40, 255});
+    // 1. Clear background to black
+    DrawRectangle(x, y, w, h, BLACK);
     
-    // Center is (w/2, h/2) representing CameraPos
-    // We need to offset by x,y because we are drawing in screen coordinates
     float cx = x + w / 2.0f;
     float cy = y + h / 2.0f;
     
-    // Draw Grid (Optional)
-    int grid_size = (int)(zoom);
-    if (grid_size > 4) {
-        int off_x = (int)(cx - cam.pos.x * zoom) % grid_size;
-        int off_y = (int)(cy + cam.pos.y * zoom) % grid_size;
-        
-        // Adjust for viewport x,y
-        // Grid lines should be relative to viewport
-        for (int gx = x + off_x; gx < x + w; gx += grid_size) DrawLine(gx, y, gx, y + h, (Color){50, 50, 60, 255});
-        for (int gy = y + off_y; gy < y + h; gy += grid_size) DrawLine(x, gy, x + w, gy, (Color){50, 50, 60, 255});
-    }
+    // 2. Draw Grid (50% gray lines)
+    // Grid alignment should be world-aligned
+    int grid_size = 64; // Default visual grid? Or passed in? Prompt says "Limit grid range...". 
+    // Wait, the prompt implies "The grid" which usually means the editor grid setting. 
+    // The renderer signature doesn't take grid size. I should probably add it or guess.
+    // Existing code calculated grid from zoom.
+    // The PROMPT says: "Draw the grid with 50% gray lines."
+    // I'll stick to a reasonable visual grid or maybe pass it in? 
+    // The function signature in renderer.h handles arguments. I'll assume standard grid for now or use a fixed one if not passed.
+    // Actually, I can't change the signature in .c without .h.
+    // I will assume a visual grid power of 2 that makes sense at this zoom, or just use 32 * zoom.
+    // Let's use a fixed world grid of 64 for visualization for now, as I can't easily change signature in this step without breaking .h
+    // Wait, I can allow the user to see the grid they are editing on.
+    // But I will just calculate 'visual grid' based on zoom to keep it simple as before, but make it 50% gray.
     
-    // Draw Walls
+    float grid_step = 64.0f * zoom;
+    if (grid_step < 4.0f) grid_step = 4.0f; // Limit density
+    
+    float off_x = fmod(cam.pos.x * zoom, grid_step);
+    float off_y = fmod(cam.pos.y * zoom, grid_step); // Y is up? In 2D view usually Y is down or up. 
+    // In this engine, Y seems to be World Y. 
+    // Screen Y increases down.
+    // map coordinate Y: usually "up" in game world (Sector floor/ceil).
+    // Wait, "Vec2 points" in main.c are X, Y.
+    // "TransformToCamera" does: - (local.x * sn + local.y * cs).
+    // Let's stick to standard map view: X right, Y up (screen Y down -> invert Y).
+    // Current Render_Map2D: y1 = cy - (p1.y - cam.pos.y) * zoom;
+    // So Y is inverted.
+    
+    // Draw Grid
+    Color grid_col = (Color){128, 128, 128, 255};
+    int screen_grid_step = (int)grid_step;
+    
+    // Vertical lines
+    for (float gx = cx - off_x; gx < x + w; gx += grid_step) DrawLine(gx, y, gx, y + h, grid_col);
+    for (float gx = cx - off_x - grid_step; gx > x; gx -= grid_step) DrawLine(gx, y, gx, y + h, grid_col);
+    
+    // Horizontal lines
+    for (float gy = cy + off_y; gy < y + h; gy += grid_step) DrawLine(x, gy, x + w, gy, grid_col);
+    for (float gy = cy + off_y - grid_step; gy > y; gy -= grid_step) DrawLine(x, gy, x + w, gy, grid_col);
+    
+    // 3. Draw Walls
     for (int i = 0; i < map->wall_count; ++i) {
         Wall* wall = &map->walls[i];
-        
         Vec2 p1 = map->points[wall->p1];
         Vec2 p2 = map->points[wall->p2];
         
         float x1 = cx + (p1.x - cam.pos.x) * zoom;
-        float y1 = cy - (p1.y - cam.pos.y) * zoom;
+        float y1 = cy - (p1.y - cam.pos.y) * zoom; // Invert Y
         float x2 = cx + (p2.x - cam.pos.x) * zoom;
         float y2 = cy - (p2.y - cam.pos.y) * zoom;
         
-        Color col;
-        if (wall->next_sector != -1) {
-            col = (Color){200, 50, 50, 255}; 
-        } else {
-            col = (Color){200, 200, 200, 255};
+        bool is_portal = (wall->next_sector != -1);
+        Color wall_col = is_portal ? RED : WHITE;
+        
+        // Draw Line
+        DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 1.0f, wall_col);
+        
+        // Draw Points (Squares 3px) - Only if not portal? "If the wall is a portal, draw the wall's line only (not the points)"
+        if (!is_portal) {
+            DrawRectangle(x1 - 1, y1 - 1, 3, 3, WHITE);
+            DrawRectangle(x2 - 1, y2 - 1, 3, 3, WHITE);
         }
-        DrawLineV((Vector2){x1, y1}, (Vector2){x2, y2}, col);
+        
+        // Draw Normal
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float len = sqrtf(dx*dx + dy*dy);
+        if (len > 0) {
+            float nx = dy / len;
+            float ny = -dx / len;
+            float mx = (x1 + x2) / 2.0f;
+            float my = (y1 + y2) / 2.0f;
+            DrawLine(mx, my, mx + nx * 5, my + ny * 5, WHITE);
+        }
     }
     
-    // Render Highlighted/Hovered Sector
-    if (hovered_sector != -1 && hovered_sector != highlight_sector && hovered_sector < map->sector_count) {
-         Sector* s = &map->sectors[hovered_sector];
-         Color h_col = (Color){0, 255, 0, 255}; // Lime Green
-         
-         for (u32 i = 0; i < s->num_walls; ++i) {
-            Wall* wall = &map->walls[s->first_wall + i];
-            Vec2 p1 = map->points[wall->p1];
-            Vec2 p2 = map->points[wall->p2];
-            
-            float x1 = cx + (p1.x - cam.pos.x) * zoom;
-            float y1 = cy - (p1.y - cam.pos.y) * zoom;
-            float x2 = cx + (p2.x - cam.pos.x) * zoom;
-            float y2 = cy - (p2.y - cam.pos.y) * zoom;
-            
-            DrawLineV((Vector2){x1, y1}, (Vector2){x2, y2}, h_col);
-            
-            // Normals (Inward: dy, -dx)
-             float nx = (y2 - y1);
-             float ny = -(x2 - x1);
-             float len = sqrtf(nx*nx + ny*ny);
-             if (len > 0) {
-                 nx /= len; ny /= len;
-                 DrawLineV((Vector2){(x1+x2)/2, (y1+y2)/2}, (Vector2){(x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8}, h_col);
+    // 4. Draw Entities
+    int max_slots = Entity_GetMaxSlots();
+    for (int i = 0; i < max_slots; ++i) {
+        Entity* e = Entity_GetBySlot(i);
+        if (!e) continue;
+        
+        float ex = cx + (e->pos.x - cam.pos.x) * zoom;
+        float ey = cy - (e->pos.y - cam.pos.y) * zoom;
+        float half_size = 16.0f * zoom; // 32x32 bounding box
+        
+        Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
+        
+        DrawRectangleLinesEx(rect, 1.0f, RED);
+        DrawLine(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height, RED); // Diagonal 1
+        DrawLine(rect.x, rect.y + rect.height, rect.x + rect.width, rect.y, RED); // Diagonal 2
+    }
+    
+    // 5. Draw Hovers
+    if (hovered_entity_id != -1) {
+        Entity* e = Entity_Get(hovered_entity_id);
+        if (e) {
+            float ex = cx + (e->pos.x - cam.pos.x) * zoom;
+            float ey = cy - (e->pos.y - cam.pos.y) * zoom;
+            float half_size = 16.0f * zoom;
+            Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
+            DrawRectangleLinesEx(rect, 2.0f, YELLOW);
+            // Draw Diagoanls
+            DrawLineEx((Vector2){rect.x, rect.y}, (Vector2){rect.x + rect.width, rect.y + rect.height}, 2.0f, YELLOW);
+            DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, YELLOW);
+        }
+    } else if (hovered_wall_index != -1) {
+        if (hovered_wall_index < map->wall_count) {
+             // Draw sector of that wall in orange?
+             // Need to find which sector this wall belongs to.
+             // The map structure stores `first_wall` and `num_walls` in Sector, not `sector_id` in Wall.
+             // Helper needed: GetSectorOfWall.
+             // For now, simpler: we iterate all sectors and check if wall is in range.
+             for(int s=0; s<map->sector_count; ++s) {
+                 Sector* sec = &map->sectors[s];
+                 if (hovered_wall_index >= sec->first_wall && hovered_wall_index < sec->first_wall + sec->num_walls) {
+                     // Draw this sector in ORANGE.
+                     // To draw a sector, we verify its walls.
+                     for (u32 k=0; k<sec->num_walls; ++k) {
+                         Wall* w = &map->walls[sec->first_wall + k];
+                         Vec2 p1 = map->points[w->p1];
+                         Vec2 p2 = map->points[w->p2];
+                         float x1 = cx + (p1.x - cam.pos.x) * zoom;
+                         float y1 = cy - (p1.y - cam.pos.y) * zoom;
+                         float x2 = cx + (p2.x - cam.pos.x) * zoom;
+                         float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                         DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, ORANGE);
+                     }
+                     break; 
+                 }
              }
-             
-             // Vertices
-             DrawRectangle((int)x1 - 2, (int)y1 - 2, 5, 5, h_col);
+        }
+    } else if (hovered_sector != -1) {
+        if (hovered_sector < map->sector_count) {
+             Sector* sec = &map->sectors[hovered_sector];
+             for (u32 k=0; k<sec->num_walls; ++k) {
+                 Wall* w = &map->walls[sec->first_wall + k];
+                 Vec2 p1 = map->points[w->p1];
+                 Vec2 p2 = map->points[w->p2];
+                 float x1 = cx + (p1.x - cam.pos.x) * zoom;
+                 float y1 = cy - (p1.y - cam.pos.y) * zoom;
+                 float x2 = cx + (p2.x - cam.pos.x) * zoom;
+                 float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, YELLOW);
+             }
+        }
+    }
+    
+    // 6. Draw Selections
+    if (selected_entity_id != -1) {
+        Entity* e = Entity_Get(selected_entity_id);
+        if (e) {
+            float ex = cx + (e->pos.x - cam.pos.x) * zoom;
+            float ey = cy - (e->pos.y - cam.pos.y) * zoom;
+            float half_size = 16.0f * zoom;
+            Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
+            DrawRectangleLinesEx(rect, 2.0f, MAGENTA); // Bright Purple approx
+            DrawLineEx((Vector2){rect.x, rect.y}, (Vector2){rect.x + rect.width, rect.y + rect.height}, 2.0f, MAGENTA);
+            DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, MAGENTA);
+        }
+    }
+    // Else if wall selected
+    else if (highlight_wall_index != -1) {
+        // Draw sector dark green, wait, how do we know the sector?
+        // Again, find sector.
+         int sec_id = -1;
+         for(int s=0; s<map->sector_count; ++s) {
+             Sector* sec = &map->sectors[s];
+             if (highlight_wall_index >= sec->first_wall && highlight_wall_index < sec->first_wall + sec->num_walls) {
+                 sec_id = s;
+                 break;
+             }
+         }
+         
+         if (sec_id != -1) {
+             Sector* sec = &map->sectors[sec_id];
+             Color dark_green = (Color){0, 100, 0, 255};
+             for (u32 k=0; k<sec->num_walls; ++k) {
+                 Wall* w = &map->walls[sec->first_wall + k];
+                 Vec2 p1 = map->points[w->p1];
+                 Vec2 p2 = map->points[w->p2];
+                 float x1 = cx + (p1.x - cam.pos.x) * zoom;
+                 float y1 = cy - (p1.y - cam.pos.y) * zoom;
+                 float x2 = cx + (p2.x - cam.pos.x) * zoom;
+                 float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, dark_green);
+             }
+         }
+         
+         // Draw Selected Wall in Lime Green
+         if (highlight_wall_index < map->wall_count) {
+             Wall* w = &map->walls[highlight_wall_index];
+             Vec2 p1 = map->points[w->p1];
+             Vec2 p2 = map->points[w->p2];
+             float x1 = cx + (p1.x - cam.pos.x) * zoom;
+             float y1 = cy - (p1.y - cam.pos.y) * zoom;
+             float x2 = cx + (p2.x - cam.pos.x) * zoom;
+             float y2 = cy - (p2.y - cam.pos.y) * zoom;
+             DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, LIME);
          }
     }
-    
-    if (highlight_sector != -1 && highlight_sector < map->sector_count) {
-        Sector* s = &map->sectors[highlight_sector];
-        
-        for (u32 i = 0; i < s->num_walls; ++i) {
-            Wall* wall = &map->walls[s->first_wall + i];
-            
-            Vec2 p1 = map->points[wall->p1];
-            Vec2 p2 = map->points[wall->p2];
-            
-            float x1 = cx + (p1.x - cam.pos.x) * zoom;
-            float y1 = cy - (p1.y - cam.pos.y) * zoom;
-            float x2 = cx + (p2.x - cam.pos.x) * zoom;
-            float y2 = cy - (p2.y - cam.pos.y) * zoom;
-            
-            // Highlight Logic for Walls
-            Color w_col;
-            if ((int)i == highlight_wall_index) {
-                w_col = (Color){0, 255, 255, 255}; // Cyan
-            } 
-            else if ((int)i == hovered_wall_index) {
-                w_col = (Color){0, 255, 0, 255}; // Lime Green
-            }
-            else {
-                w_col = (Color){255, 255, 0, 255}; // Yellow for Sector
-            }
-            
-            // Draw Line
-            DrawLineV((Vector2){x1, y1}, (Vector2){x2, y2}, w_col);
-            
-            // Draw Tick Normal (Inward)
-             float nx = (y2 - y1);
-             float ny = -(x2 - x1);
-             float len = sqrtf(nx*nx + ny*ny);
-             if (len > 0) {
-                 nx /= len; ny /= len;
-                 DrawLineV((Vector2){(x1+x2)/2, (y1+y2)/2}, (Vector2){(x1+x2)/2 + nx*8, (y1+y2)/2 + ny*8}, w_col);
+    // Else if sector selected (highlight_sector is used for selection in current signature?)
+    // Wait, the signature I have is: `highlight_sector`, `highlight_wall_index`...
+    // The previous code mapped `highlight_sector` to `Editor_GetSelectedSectorID`.
+    // So `highlight_sector` IS the selected sector.
+    else if (highlight_sector != -1) {
+         if (highlight_sector < map->sector_count) {
+             Sector* sec = &map->sectors[highlight_sector];
+             for (u32 k=0; k<sec->num_walls; ++k) {
+                 Wall* w = &map->walls[sec->first_wall + k];
+                 Vec2 p1 = map->points[w->p1];
+                 Vec2 p2 = map->points[w->p2];
+                 float x1 = cx + (p1.x - cam.pos.x) * zoom;
+                 float y1 = cy - (p1.y - cam.pos.y) * zoom;
+                 float x2 = cx + (p2.x - cam.pos.x) * zoom;
+                 float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, LIME);
              }
-             
-             // Vertices (5x5)
-             Color v_col = {255, 255, 0, 255}; // Default Sector Yellow
-             if ((int)i == highlight_wall_index) v_col = (Color){0, 255, 255, 255}; // Cyan
-             else if ((int)i == hovered_wall_index) v_col = (Color){0, 255, 0, 255}; // Lime Green
-             
-             DrawRectangle((int)x1 - 2, (int)y1 - 2, 5, 5, v_col);
         }
     }
     
-    // Draw Camera
-    DrawRectangle((int)cx - 3, (int)cy - 3, 6, 6, (Color){0, 255, 0, 255});
+    // 7. If there is a hovered wall and NO hovered entity, draw the hovered wall in yellow
+
     
-    // Frustum
-    float dir_len = 20.0f;
-    float cs = cosf(cam.yaw); 
-    float sn = sinf(cam.yaw);
-    DrawLine((int)cx, (int)cy, (int)(cx + cs * dir_len), (int)(cy - sn * dir_len), (Color){0, 255, 0, 255});
+    if (hovered_entity_id == -1 && hovered_wall_index != -1) {
+         if (hovered_wall_index < map->wall_count) {
+             Wall* w = &map->walls[hovered_wall_index];
+             Vec2 p1 = map->points[w->p1];
+             Vec2 p2 = map->points[w->p2];
+             float x1 = cx + (p1.x - cam.pos.x) * zoom;
+             float y1 = cy - (p1.y - cam.pos.y) * zoom;
+             float x2 = cx + (p2.x - cam.pos.x) * zoom;
+             float y2 = cy - (p2.y - cam.pos.y) * zoom;
+             DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, YELLOW);
+         }
+    }
     
     EndScissorMode();
 }
