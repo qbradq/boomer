@@ -372,7 +372,7 @@ void Render_Frame(GameCamera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zoom, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id) {
+void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id) {
     // Set viewport/clip
     BeginScissorMode(x, y, w, h);
     
@@ -382,46 +382,28 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
     float cx = x + w / 2.0f;
     float cy = y + h / 2.0f;
     
-    // 2. Draw Grid (50% gray lines)
-    // Grid alignment should be world-aligned
-    int grid_size = 64; // Default visual grid? Or passed in? Prompt says "Limit grid range...". 
-    // Wait, the prompt implies "The grid" which usually means the editor grid setting. 
-    // The renderer signature doesn't take grid size. I should probably add it or guess.
-    // Existing code calculated grid from zoom.
-    // The PROMPT says: "Draw the grid with 50% gray lines."
-    // I'll stick to a reasonable visual grid or maybe pass it in? 
-    // The function signature in renderer.h handles arguments. I'll assume standard grid for now or use a fixed one if not passed.
-    // Actually, I can't change the signature in .c without .h.
-    // I will assume a visual grid power of 2 that makes sense at this zoom, or just use 32 * zoom.
-    // Let's use a fixed world grid of 64 for visualization for now, as I can't easily change signature in this step without breaking .h
-    // Wait, I can allow the user to see the grid they are editing on.
-    // But I will just calculate 'visual grid' based on zoom to keep it simple as before, but make it 50% gray.
+    // 2. Draw Grid
+    // Use passed grid_size, adjusted by zoom
+    float visual_grid_step = (float)grid_size * zoom;
     
-    float grid_step = 64.0f * zoom;
-    if (grid_step < 4.0f) grid_step = 4.0f; // Limit density
+    // If grid gets too dense, double spacing until it's reasonable
+    while (visual_grid_step < 4.0f) {
+        visual_grid_step *= 2.0f;
+    }
     
-    float off_x = fmod(cam.pos.x * zoom, grid_step);
-    float off_y = fmod(cam.pos.y * zoom, grid_step); // Y is up? In 2D view usually Y is down or up. 
-    // In this engine, Y seems to be World Y. 
-    // Screen Y increases down.
-    // map coordinate Y: usually "up" in game world (Sector floor/ceil).
-    // Wait, "Vec2 points" in main.c are X, Y.
-    // "TransformToCamera" does: - (local.x * sn + local.y * cs).
-    // Let's stick to standard map view: X right, Y up (screen Y down -> invert Y).
-    // Current Render_Map2D: y1 = cy - (p1.y - cam.pos.y) * zoom;
-    // So Y is inverted.
+    float off_x = fmod(cam.pos.x * zoom, visual_grid_step);
+    float off_y = fmod(cam.pos.y * zoom, visual_grid_step);
     
-    // Draw Grid
-    Color grid_col = (Color){128, 128, 128, 255};
-    int screen_grid_step = (int)grid_step;
+    // Draw Grid (25% brightness - 64/255)
+    Color grid_col = (Color){64, 64, 64, 255};
     
     // Vertical lines
-    for (float gx = cx - off_x; gx < x + w; gx += grid_step) DrawLine(gx, y, gx, y + h, grid_col);
-    for (float gx = cx - off_x - grid_step; gx > x; gx -= grid_step) DrawLine(gx, y, gx, y + h, grid_col);
+    for (float gx = cx - off_x; gx < x + w; gx += visual_grid_step) DrawLine(gx, y, gx, y + h, grid_col);
+    for (float gx = cx - off_x - visual_grid_step; gx > x; gx -= visual_grid_step) DrawLine(gx, y, gx, y + h, grid_col);
     
     // Horizontal lines
-    for (float gy = cy + off_y; gy < y + h; gy += grid_step) DrawLine(x, gy, x + w, gy, grid_col);
-    for (float gy = cy + off_y - grid_step; gy > y; gy -= grid_step) DrawLine(x, gy, x + w, gy, grid_col);
+    for (float gy = cy + off_y; gy < y + h; gy += visual_grid_step) DrawLine(x, gy, x + w, gy, grid_col);
+    for (float gy = cy + off_y - visual_grid_step; gy > y; gy -= visual_grid_step) DrawLine(x, gy, x + w, gy, grid_col);
     
     // 3. Draw Walls
     for (int i = 0; i < map->wall_count; ++i) {

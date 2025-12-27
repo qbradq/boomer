@@ -45,6 +45,7 @@ int Editor_GetViewMode(void);
 
 // Get Current Zoom Level
 float Editor_GetZoom(void);
+int Editor_GetGridSize(void);
 
 
 

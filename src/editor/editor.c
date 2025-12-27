@@ -112,6 +112,13 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         else zoom_level /= 2.0f;
     }
 
+    // Panning with Right Mouse Button
+    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+        Vector2 delta = GetMouseDelta();
+        cam->pos.x -= delta.x / zoom_level;
+        cam->pos.y += delta.y / zoom_level;
+    }
+
     // World Mouse Pos
     Rectangle game_rect = GetGameViewRect();
     Vector2 mouse_s = GetMousePosition();
@@ -476,4 +483,8 @@ int Editor_GetHoveredEntityID(void) {
 
 float Editor_GetZoom(void) {
     return zoom_level;
+}
+
+int Editor_GetGridSize(void) {
+    return grid_size;
 }
