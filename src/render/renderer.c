@@ -372,7 +372,7 @@ void Render_Frame(GameCamera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id) {
+void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id, int hovered_point_index, int selected_point_index) {
     // Set viewport/clip
     BeginScissorMode(x, y, w, h);
     
@@ -422,10 +422,10 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
         // Draw Line
         DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 1.0f, wall_col);
         
-        // Draw Points (Squares 3px) - Only if not portal? "If the wall is a portal, draw the wall's line only (not the points)"
+        // Draw Points (Squares 5px) - Only if not portal? "If the wall is a portal, draw the wall's line only (not the points)"
         if (!is_portal) {
-            DrawRectangle(x1 - 1, y1 - 1, 3, 3, WHITE);
-            DrawRectangle(x2 - 1, y2 - 1, 3, 3, WHITE);
+            DrawRectangle(x1 - 2, y1 - 2, 5, 5, WHITE);
+            DrawRectangle(x2 - 2, y2 - 2, 5, 5, WHITE);
         }
         
         // Draw Normal
@@ -471,6 +471,30 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
             DrawLineEx((Vector2){rect.x, rect.y}, (Vector2){rect.x + rect.width, rect.y + rect.height}, 2.0f, YELLOW);
             DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, YELLOW);
         }
+    } else if (hovered_point_index != -1 && hovered_wall_index != -1) {
+        // If there is a hovered point and a hovered wall, still draw the wall's sector in orange,
+        // but do not draw the hovered wall in yellow. Instead, draw only the hovered point in yellow.
+        if (hovered_wall_index < map->wall_count) {
+            // Draw sector of that wall in orange
+            for(int s=0; s<map->sector_count; ++s) {
+                Sector* sec = &map->sectors[s];
+                if (hovered_wall_index >= sec->first_wall && hovered_wall_index < sec->first_wall + sec->num_walls) {
+                    // Draw this sector in ORANGE.
+                    for (u32 k=0; k<sec->num_walls; ++k) {
+                        Wall* w = &map->walls[sec->first_wall + k];
+                        Vec2 p1 = map->points[w->p1];
+                        Vec2 p2 = map->points[w->p2];
+                        float x1 = cx + (p1.x - view_pos.x) * zoom;
+                        float y1 = cy - (p1.y - view_pos.y) * zoom;
+                        float x2 = cx + (p2.x - view_pos.x) * zoom;
+                        float y2 = cy - (p2.y - view_pos.y) * zoom;
+                        DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, ORANGE);
+                    }
+                    break; 
+                }
+            }
+        }
+        // Draw hovered point in yellow (will be drawn at end of hover section)
     } else if (hovered_wall_index != -1) {
         if (hovered_wall_index < map->wall_count) {
              // Draw sector of that wall in orange?
@@ -513,6 +537,17 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
         }
     }
     
+    // Draw hovered point in yellow (if there is one and no hovered entity)
+    if (hovered_entity_id == -1 && hovered_point_index != -1) {
+        if (hovered_point_index < map->point_count) {
+            Vec2 pt = map->points[hovered_point_index];
+            float px = cx + (pt.x - view_pos.x) * zoom;
+            float py = cy - (pt.y - view_pos.y) * zoom;
+            // Draw point as a square in yellow (11x11)
+            DrawRectangle(px - 5, py - 5, 11, 11, YELLOW);
+        }
+    }
+    
     // 6. Draw Selections
     if (selected_entity_id != -1) {
         Entity* e = Entity_Get(selected_entity_id);
@@ -526,7 +561,18 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
             DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, MAGENTA);
         }
     }
-    // Else if wall selected
+    // Else if point selected
+    else if (selected_point_index != -1) {
+        // Draw selected point in bright cyan
+        if (selected_point_index < map->point_count) {
+            Vec2 pt = map->points[selected_point_index];
+            float px = cx + (pt.x - view_pos.x) * zoom;
+            float py = cy - (pt.y - view_pos.y) * zoom;
+            // Draw point as a square in bright cyan (11x11)
+            DrawRectangle(px - 5, py - 5, 11, 11, (Color){0, 255, 255, 255}); // Cyan
+        }
+    }
+    // Else if wall selected (only draw if no selected point)
     else if (highlight_wall_index != -1) {
         // Draw sector dark green, wait, how do we know the sector?
         // Again, find sector.
@@ -586,10 +632,8 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
         }
     }
     
-    // 7. If there is a hovered wall and NO hovered entity, draw the hovered wall in yellow
-
-    
-    if (hovered_entity_id == -1 && hovered_wall_index != -1 && hovered_wall_index != highlight_wall_index) {
+    // 7. If there is a hovered wall and NO hovered entity and NO hovered point, draw the hovered wall in yellow
+    if (hovered_entity_id == -1 && hovered_point_index == -1 && hovered_wall_index != -1 && hovered_wall_index != highlight_wall_index) {
          if (hovered_wall_index < map->wall_count) {
              Wall* w = &map->walls[hovered_wall_index];
              Vec2 p1 = map->points[w->p1];

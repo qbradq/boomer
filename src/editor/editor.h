@@ -57,6 +57,8 @@ int Editor_GetHoveredSectorID(void);
 int Editor_GetHoveredWallIndex(void);
 int Editor_GetSelectedEntityID(void);
 int Editor_GetHoveredEntityID(void);
+int Editor_GetHoveredPointIndex(void);
+int Editor_GetSelectedPointIndex(void);
 
 #endif
 

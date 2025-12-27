@@ -24,7 +24,8 @@ typedef enum {
     SEL_NONE,
     SEL_SECTOR,
     SEL_WALL,
-    SEL_ENTITY
+    SEL_ENTITY,
+    SEL_POINT
 } SelectionType;
 
 static EditorTool current_tool = TOOL_SELECT;
@@ -37,6 +38,7 @@ static int sel_id = -1;
 static int hovered_sector = -1;
 static int hovered_wall = -1;
 static int hovered_entity = -1;
+static int hovered_point = -1;
 
 // View State
 static Vec2 view_pos = {0};
@@ -164,6 +166,7 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         hovered_entity = -1;
         hovered_wall = -1;
         hovered_sector = -1;
+        hovered_point = -1;
         return;
     }
     
@@ -190,6 +193,7 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
     hovered_entity = -1;
     hovered_wall = -1;
     hovered_sector = -1;
+    hovered_point = -1;
     
     // 1. Entities (32x32 box)
     int max_slots = Entity_GetMaxSlots();
@@ -206,20 +210,42 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         }
     }
     
-    // 2. Walls (10px screen tolerance)
+    // 2. Points (10px screen tolerance)
     float screen_tol = 10.0f;
     
+    if (hovered_entity == -1) {
+        // Check all points for hover
+        for (int i = 0; i < (int)map->point_count; ++i) {
+            Vec2 pt = map->points[i];
+            
+            // Project to Screen (use view_pos for consistency with rendering)
+            float sx = cx + (pt.x - view_pos.x) * zoom_level;
+            float sy = cy - (pt.y - view_pos.y) * zoom_level;
+            
+            // Calculate distance from mouse to point
+            float dx = mouse_s.x - sx;
+            float dy = mouse_s.y - sy;
+            float dist = sqrtf(dx * dx + dy * dy);
+            
+            if (dist <= screen_tol) {
+                hovered_point = i;
+                break; // First point that's close enough
+            }
+        }
+    }
+    
+    // 3. Walls (10px screen tolerance)
     if (hovered_entity == -1) {
         for (int i = 0; i < (int)map->wall_count; ++i) {
             Wall* w = &map->walls[i];
             Vec2 p1 = map->points[w->p1];
             Vec2 p2 = map->points[w->p2];
             
-            // Project to Screen
-            float sx1 = cx + (p1.x - cam->pos.x) * zoom_level;
-            float sy1 = cy - (p1.y - cam->pos.y) * zoom_level;
-            float sx2 = cx + (p2.x - cam->pos.x) * zoom_level;
-            float sy2 = cy - (p2.y - cam->pos.y) * zoom_level;
+            // Project to Screen (use view_pos for consistency with rendering)
+            float sx1 = cx + (p1.x - view_pos.x) * zoom_level;
+            float sy1 = cy - (p1.y - view_pos.y) * zoom_level;
+            float sx2 = cx + (p2.x - view_pos.x) * zoom_level;
+            float sy2 = cy - (p2.y - view_pos.y) * zoom_level;
             
             float screen_dist = DistToLine(mouse_s, (Vector2){sx1, sy1}, (Vector2){sx2, sy2});
             
@@ -249,8 +275,8 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         }
     }
     
-    // 3. Sectors
-    if (hovered_entity == -1 && hovered_wall == -1) {
+    // 4. Sectors
+    if (hovered_entity == -1 && hovered_wall == -1 && hovered_point == -1) {
         // Point in sector
         int sec = GetSectorAt(map, (Vec2){wx, wy});
         if (sec != -1) {
@@ -297,6 +323,9 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         if (hovered_entity != -1) {
             sel_type = SEL_ENTITY;
             sel_id = hovered_entity;
+        } else if (hovered_point != -1) {
+            sel_type = SEL_POINT;
+            sel_id = hovered_point;
         } else if (hovered_wall != -1) {
             sel_type = SEL_WALL;
             sel_id = hovered_wall;
@@ -407,6 +436,8 @@ static void DrawSidebar(void) {
         GuiGroupBox((Rectangle){x, y, w, 150}, "Wall Properties");
     } else if (sel_type == SEL_ENTITY) {
         GuiGroupBox((Rectangle){x, y, w, 150}, "Entity Properties");
+    } else if (sel_type == SEL_POINT) {
+        GuiGroupBox((Rectangle){x, y, w, 150}, "Point Properties");
     }
 }
 
@@ -457,6 +488,9 @@ static void DrawStatusBar(void) {
         status_text = buf;
     } else if (sel_type == SEL_SECTOR) {
         snprintf(buf, 64, "Sector %d", sel_id);
+        status_text = buf;
+    } else if (sel_type == SEL_POINT) {
+        snprintf(buf, 64, "Point %d", sel_id);
         status_text = buf;
     }
     
@@ -515,6 +549,14 @@ int Editor_GetSelectedEntityID(void) {
 
 int Editor_GetHoveredEntityID(void) {
     return hovered_entity;
+}
+
+int Editor_GetHoveredPointIndex(void) {
+    return hovered_point;
+}
+
+int Editor_GetSelectedPointIndex(void) {
+    return (sel_type == SEL_POINT) ? sel_id : -1;
 }
 
 float Editor_GetZoom(void) {

@@ -228,7 +228,8 @@ void Loop(void) {
                 Editor_GetGridSize(),
                 Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), 
                 Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex(),
-                Editor_GetSelectedEntityID(), Editor_GetHoveredEntityID()); 
+                Editor_GetSelectedEntityID(), Editor_GetHoveredEntityID(),
+                Editor_GetHoveredPointIndex(), Editor_GetSelectedPointIndex()); 
  
         }
         Editor_Render(&map, &cam);
