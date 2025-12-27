@@ -381,34 +381,28 @@ static void DrawStatusBar(void) {
     float cur_x = bounds.x + bounds.width;
     float element_w = 100;
     
-    // Tool
+    // 1. Tool (Rightmost)
     cur_x -= element_w;
     const char* tool_name = "SELECT";
     if (current_tool == TOOL_SECTOR) tool_name = "SECTOR";
     if (current_tool == TOOL_ENTITY) tool_name = "ENTITY";
     GuiLabel((Rectangle){cur_x, bounds.y, element_w, bounds.height}, TextFormat("TOOL: %s", tool_name));
     
-    // Pos
+    // 2. Pos
     cur_x -= element_w;
-    // Show Screen Mouse? Or world mouse? Usually world.
-    // Need game camera and mouse pos to calc world.
-    // We don't have access to camera here directly easily without passing it or globals.
-    // Editor_Update usage of mouse_s logic is internal.
-    // Let's just show Mouse X/Y generic or leave 0,0 for now as proper calc requires state.
     GuiLabel((Rectangle){cur_x, bounds.y, element_w, bounds.height}, "POS: (0,0)");
     
-    // Zoom
+    // 3. Zoom
     cur_x -= element_w;
     GuiLabel((Rectangle){cur_x, bounds.y, element_w, bounds.height}, TextFormat("ZOOM: %.2f", zoom_level));
     
-    // Grid
+    // 4. Grid
     cur_x -= element_w;
     GuiLabel((Rectangle){cur_x, bounds.y, element_w, bounds.height}, TextFormat("GRID: %d", grid_size));
     
-    // Selection Info (Status)
-    // "Add a statusbar element ... that displays what is selected."
-    // "For instance, if entity with ID 4 is selected, it should say "Entity 4""
-    float status_w = cur_x - bounds.x - 10;
+    // 5. Selection Info (To the left of Grid)
+    cur_x -= element_w;
+    
     const char* status_text = "No Selection";
     static char buf[64];
     
@@ -423,7 +417,13 @@ static void DrawStatusBar(void) {
         status_text = buf;
     }
     
-    GuiLabel((Rectangle){bounds.x + 10, bounds.y, status_w, bounds.height}, status_text);
+    GuiLabel((Rectangle){cur_x, bounds.y, element_w, bounds.height}, status_text);
+    
+    // Left-aligned Element: Map Name / Info
+    // "replaced the filename display on the left" -> restore it.
+    // We don't have map name in Editor struct yet, just hardcode "Map: Untitled" or similar.
+    // Or if we want to be fancy, finding map name would require refactoring.
+    GuiLabel((Rectangle){bounds.x + 10, bounds.y, 200, bounds.height}, "Map: demo.map");
 }
 
 void Editor_Render(struct Map* map, struct GameCamera* cam) {

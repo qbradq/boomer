@@ -559,7 +559,7 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
          
          if (sec_id != -1) {
              Sector* sec = &map->sectors[sec_id];
-             Color dark_green = (Color){0, 100, 0, 255};
+             Color lime_green = (Color){0, 255, 0, 255}; // Lime Green
              for (u32 k=0; k<sec->num_walls; ++k) {
                  Wall* w = &map->walls[sec->first_wall + k];
                  Vec2 p1 = map->points[w->p1];
@@ -568,11 +568,11 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
                  float y1 = cy - (p1.y - cam.pos.y) * zoom;
                  float x2 = cx + (p2.x - cam.pos.x) * zoom;
                  float y2 = cy - (p2.y - cam.pos.y) * zoom;
-                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, dark_green);
+                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, lime_green);
              }
          }
          
-         // Draw Selected Wall in Lime Green
+         // Draw Selected Wall in Bright Cyan
          if (highlight_wall_index < map->wall_count) {
              Wall* w = &map->walls[highlight_wall_index];
              Vec2 p1 = map->points[w->p1];
@@ -581,7 +581,7 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
              float y1 = cy - (p1.y - cam.pos.y) * zoom;
              float x2 = cx + (p2.x - cam.pos.x) * zoom;
              float y2 = cy - (p2.y - cam.pos.y) * zoom;
-             DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, LIME);
+             DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, (Color){0, 255, 255, 255}); // Cyan
          }
     }
     // Else if sector selected (highlight_sector is used for selection in current signature?)
@@ -607,7 +607,7 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
     // 7. If there is a hovered wall and NO hovered entity, draw the hovered wall in yellow
 
     
-    if (hovered_entity_id == -1 && hovered_wall_index != -1) {
+    if (hovered_entity_id == -1 && hovered_wall_index != -1 && hovered_wall_index != highlight_wall_index) {
          if (hovered_wall_index < map->wall_count) {
              Wall* w = &map->walls[hovered_wall_index];
              Vec2 p1 = map->points[w->p1];
