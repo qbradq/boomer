@@ -7,11 +7,22 @@ games to the web and desktop.
 
 ### Requirements
 
-All requirements will be installed automatically by CMake.
+Build Tools:
 
 - CMake 3.14 or later
 - Ninja build tools
 - Emscripten 4.0.22 or later
+
+System Libraries (Debian/Ubuntu):
+
+```bash
+sudo apt install libasound2-dev libx11-dev libxrandr-dev libxi-dev \
+libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev libxinerama-dev libwayland-dev \
+libxkbcommon-dev
+```
+
+All other requirements will be installed automatically by CMake:
+
 - raylib 5.5
 - raygui 4.0
 - QuickJS
