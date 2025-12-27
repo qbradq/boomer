@@ -80,3 +80,6 @@ PROMPT.*.md
 
 # Application output data
 /data
+
+# Symlinks for tooling
+/compile_commands.json
