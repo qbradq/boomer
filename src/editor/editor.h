@@ -5,6 +5,7 @@
 
 struct Map;
 #include <raylib.h> // For Rectangle
+#include "../world/world_types.h"
 
 struct Map;
 struct GameCamera;
@@ -46,6 +47,7 @@ int Editor_GetViewMode(void);
 // Get Current Zoom Level
 float Editor_GetZoom(void);
 int Editor_GetGridSize(void);
+Vec2 Editor_GetViewPos(void);
 
 
 

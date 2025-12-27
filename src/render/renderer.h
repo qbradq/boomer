@@ -21,7 +21,7 @@ bool WorldToScreen(Vec3 world_pos, GameCamera cam, Vec2* screen_out);
 void Render_Frame(GameCamera cam, Map* map);
 
 // Render Top-Down Map (High Resolution via Raylib)
-void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id);
+void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id);
 
 // Helper
 SectorID GetSectorAt(Map* map, Vec2 pos);

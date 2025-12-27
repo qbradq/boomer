@@ -372,7 +372,7 @@ void Render_Frame(GameCamera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id) {
+void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id) {
     // Set viewport/clip
     BeginScissorMode(x, y, w, h);
     
@@ -391,8 +391,8 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
         visual_grid_step *= 2.0f;
     }
     
-    float off_x = fmod(cam.pos.x * zoom, visual_grid_step);
-    float off_y = fmod(cam.pos.y * zoom, visual_grid_step);
+    float off_x = fmod(view_pos.x * zoom, visual_grid_step);
+    float off_y = fmod(view_pos.y * zoom, visual_grid_step);
     
     // Draw Grid (25% brightness - 64/255)
     Color grid_col = (Color){64, 64, 64, 255};
@@ -411,10 +411,10 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
         Vec2 p1 = map->points[wall->p1];
         Vec2 p2 = map->points[wall->p2];
         
-        float x1 = cx + (p1.x - cam.pos.x) * zoom;
-        float y1 = cy - (p1.y - cam.pos.y) * zoom; // Invert Y
-        float x2 = cx + (p2.x - cam.pos.x) * zoom;
-        float y2 = cy - (p2.y - cam.pos.y) * zoom;
+        float x1 = cx + (p1.x - view_pos.x) * zoom;
+        float y1 = cy - (p1.y - view_pos.y) * zoom; // Invert Y
+        float x2 = cx + (p2.x - view_pos.x) * zoom;
+        float y2 = cy - (p2.y - view_pos.y) * zoom;
         
         bool is_portal = (wall->next_sector != -1);
         Color wall_col = is_portal ? RED : WHITE;
@@ -447,8 +447,8 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
         Entity* e = Entity_GetBySlot(i);
         if (!e) continue;
         
-        float ex = cx + (e->pos.x - cam.pos.x) * zoom;
-        float ey = cy - (e->pos.y - cam.pos.y) * zoom;
+        float ex = cx + (e->pos.x - view_pos.x) * zoom;
+        float ey = cy - (e->pos.y - view_pos.y) * zoom;
         float half_size = 16.0f * zoom; // 32x32 bounding box
         
         Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
@@ -462,8 +462,8 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
     if (hovered_entity_id != -1) {
         Entity* e = Entity_Get(hovered_entity_id);
         if (e) {
-            float ex = cx + (e->pos.x - cam.pos.x) * zoom;
-            float ey = cy - (e->pos.y - cam.pos.y) * zoom;
+            float ex = cx + (e->pos.x - view_pos.x) * zoom;
+            float ey = cy - (e->pos.y - view_pos.y) * zoom;
             float half_size = 16.0f * zoom;
             Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
             DrawRectangleLinesEx(rect, 2.0f, YELLOW);
@@ -487,10 +487,10 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
                          Wall* w = &map->walls[sec->first_wall + k];
                          Vec2 p1 = map->points[w->p1];
                          Vec2 p2 = map->points[w->p2];
-                         float x1 = cx + (p1.x - cam.pos.x) * zoom;
-                         float y1 = cy - (p1.y - cam.pos.y) * zoom;
-                         float x2 = cx + (p2.x - cam.pos.x) * zoom;
-                         float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                         float x1 = cx + (p1.x - view_pos.x) * zoom;
+                         float y1 = cy - (p1.y - view_pos.y) * zoom;
+                         float x2 = cx + (p2.x - view_pos.x) * zoom;
+                         float y2 = cy - (p2.y - view_pos.y) * zoom;
                          DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, ORANGE);
                      }
                      break; 
@@ -504,10 +504,10 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
                  Wall* w = &map->walls[sec->first_wall + k];
                  Vec2 p1 = map->points[w->p1];
                  Vec2 p2 = map->points[w->p2];
-                 float x1 = cx + (p1.x - cam.pos.x) * zoom;
-                 float y1 = cy - (p1.y - cam.pos.y) * zoom;
-                 float x2 = cx + (p2.x - cam.pos.x) * zoom;
-                 float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                 float x1 = cx + (p1.x - view_pos.x) * zoom;
+                 float y1 = cy - (p1.y - view_pos.y) * zoom;
+                 float x2 = cx + (p2.x - view_pos.x) * zoom;
+                 float y2 = cy - (p2.y - view_pos.y) * zoom;
                  DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, YELLOW);
              }
         }
@@ -517,8 +517,8 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
     if (selected_entity_id != -1) {
         Entity* e = Entity_Get(selected_entity_id);
         if (e) {
-            float ex = cx + (e->pos.x - cam.pos.x) * zoom;
-            float ey = cy - (e->pos.y - cam.pos.y) * zoom;
+            float ex = cx + (e->pos.x - view_pos.x) * zoom;
+            float ey = cy - (e->pos.y - view_pos.y) * zoom;
             float half_size = 16.0f * zoom;
             Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
             DrawRectangleLinesEx(rect, 2.0f, MAGENTA); // Bright Purple approx
@@ -546,10 +546,10 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
                  Wall* w = &map->walls[sec->first_wall + k];
                  Vec2 p1 = map->points[w->p1];
                  Vec2 p2 = map->points[w->p2];
-                 float x1 = cx + (p1.x - cam.pos.x) * zoom;
-                 float y1 = cy - (p1.y - cam.pos.y) * zoom;
-                 float x2 = cx + (p2.x - cam.pos.x) * zoom;
-                 float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                 float x1 = cx + (p1.x - view_pos.x) * zoom;
+                 float y1 = cy - (p1.y - view_pos.y) * zoom;
+                 float x2 = cx + (p2.x - view_pos.x) * zoom;
+                 float y2 = cy - (p2.y - view_pos.y) * zoom;
                  DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, lime_green);
              }
          }
@@ -559,10 +559,10 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
              Wall* w = &map->walls[highlight_wall_index];
              Vec2 p1 = map->points[w->p1];
              Vec2 p2 = map->points[w->p2];
-             float x1 = cx + (p1.x - cam.pos.x) * zoom;
-             float y1 = cy - (p1.y - cam.pos.y) * zoom;
-             float x2 = cx + (p2.x - cam.pos.x) * zoom;
-             float y2 = cy - (p2.y - cam.pos.y) * zoom;
+             float x1 = cx + (p1.x - view_pos.x) * zoom;
+             float y1 = cy - (p1.y - view_pos.y) * zoom;
+             float x2 = cx + (p2.x - view_pos.x) * zoom;
+             float y2 = cy - (p2.y - view_pos.y) * zoom;
              DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, (Color){0, 255, 255, 255}); // Cyan
          }
     }
@@ -577,10 +577,10 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
                  Wall* w = &map->walls[sec->first_wall + k];
                  Vec2 p1 = map->points[w->p1];
                  Vec2 p2 = map->points[w->p2];
-                 float x1 = cx + (p1.x - cam.pos.x) * zoom;
-                 float y1 = cy - (p1.y - cam.pos.y) * zoom;
-                 float x2 = cx + (p2.x - cam.pos.x) * zoom;
-                 float y2 = cy - (p2.y - cam.pos.y) * zoom;
+                 float x1 = cx + (p1.x - view_pos.x) * zoom;
+                 float y1 = cy - (p1.y - view_pos.y) * zoom;
+                 float x2 = cx + (p2.x - view_pos.x) * zoom;
+                 float y2 = cy - (p2.y - view_pos.y) * zoom;
                  DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, LIME);
              }
         }
@@ -594,13 +594,39 @@ void Render_Map2D(Map* map, GameCamera cam, int x, int y, int w, int h, float zo
              Wall* w = &map->walls[hovered_wall_index];
              Vec2 p1 = map->points[w->p1];
              Vec2 p2 = map->points[w->p2];
-             float x1 = cx + (p1.x - cam.pos.x) * zoom;
-             float y1 = cy - (p1.y - cam.pos.y) * zoom;
-             float x2 = cx + (p2.x - cam.pos.x) * zoom;
-             float y2 = cy - (p2.y - cam.pos.y) * zoom;
+             float x1 = cx + (p1.x - view_pos.x) * zoom;
+             float y1 = cy - (p1.y - view_pos.y) * zoom;
+             float x2 = cx + (p2.x - view_pos.x) * zoom;
+             float y2 = cy - (p2.y - view_pos.y) * zoom;
              DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, YELLOW);
          }
     }
+    
+    // 5. Draw Camera
+    float scale = zoom; // Convert world units to pixels
+    float L = 32.0f * scale;
+    float half_W = 8.0f * scale; // Total width 16
+    
+    // Camera Screen Pos
+    float cam_sx = cx + (cam.pos.x - view_pos.x) * zoom;
+    float cam_sy = cy - (cam.pos.y - view_pos.y) * zoom;
+    
+    float ang = -cam.yaw;
+    float c = cosf(ang);
+    float s = sinf(ang);
+    
+    Vector2 fwd = { c, s };
+    Vector2 side = { -s, c }; // Right vector (90 deg)
+    
+    // Tip at L distance forward from Camera Screen Pos
+    Vector2 v_tip = { cam_sx + fwd.x * L, cam_sy + fwd.y * L };
+    
+    // Base corners
+    Vector2 v_left = { cam_sx - side.x * half_W, cam_sy - side.y * half_W };
+    Vector2 v_right = { cam_sx + side.x * half_W, cam_sy + side.y * half_W };
+    
+    Color col_cam = (Color){255, 0, 255, 255}; // Magenta
+    DrawTriangle(v_tip, v_left, v_right, col_cam);
     
     EndScissorMode();
 }

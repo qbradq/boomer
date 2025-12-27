@@ -224,7 +224,7 @@ void Loop(void) {
             Render_Frame(cam, &map);
             Video_DrawGame(&game_rect); 
         } else {
-            Render_Map2D(&map, cam, (int)game_rect.x, (int)game_rect.y, (int)game_rect.width, (int)game_rect.height, Editor_GetZoom(), 
+            Render_Map2D(&map, cam, Editor_GetViewPos(), (int)game_rect.x, (int)game_rect.y, (int)game_rect.width, (int)game_rect.height, Editor_GetZoom(), 
                 Editor_GetGridSize(),
                 Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), 
                 Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex(),

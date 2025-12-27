@@ -38,6 +38,14 @@ static int hovered_sector = -1;
 static int hovered_wall = -1;
 static int hovered_entity = -1;
 
+// View State
+static Vec2 view_pos = {0};
+static bool view_initialized = false;
+
+Vec2 Editor_GetViewPos(void) {
+    return view_pos;
+}
+
 // Layout
 Rectangle GetGameViewRect(void) {
     if (!is_active) {
@@ -105,6 +113,17 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
     if (!is_active) return;
     // if (editor_has_focus) return; // UI has focus - handled implicitly by raygui
     
+    // World Mouse Pos
+    Rectangle game_rect = GetGameViewRect();
+    // Sync view on first frame
+    if (!view_initialized) {
+        view_pos.x = cam->pos.x;
+        view_pos.y = cam->pos.y;
+        view_initialized = true;
+    }
+
+    Vector2 mouse_s = GetMousePosition();
+
     // Zoom control with Mouse Wheel
     float wheel = GetMouseWheelMove();
     if (wheel != 0) {
@@ -115,13 +134,30 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
     // Panning with Right Mouse Button
     if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
         Vector2 delta = GetMouseDelta();
-        cam->pos.x -= delta.x / zoom_level;
-        cam->pos.y += delta.y / zoom_level;
+        view_pos.x -= delta.x / zoom_level;
+        view_pos.y += delta.y / zoom_level;
     }
 
-    // World Mouse Pos
-    Rectangle game_rect = GetGameViewRect();
-    Vector2 mouse_s = GetMousePosition();
+    // Teleport with Middle Mouse Button
+    if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
+         Vector2 mouse_pos = GetMousePosition();
+         if (CheckCollisionPointRec(mouse_pos, game_rect)) {
+              // Convert to World using view_pos
+              float wx = view_pos.x + (mouse_pos.x - (game_rect.x + game_rect.width/2)) / zoom_level;
+              float wy = view_pos.y - (mouse_pos.y - (game_rect.y + game_rect.height/2)) / zoom_level;
+              cam->pos.x = wx;
+              cam->pos.y = wy;
+              
+              // Center view on teleport
+              view_pos.x = wx;
+              view_pos.y = wy;
+              
+              int s = GetSectorAt(map, (Vec2){wx, wy});
+              if (s != -1) {
+                  cam->pos.z = map->sectors[s].floor_height + 50.0f;
+              }
+         }
+    }
     
     // If outside view, ignore
     if (!CheckCollisionPointRec(mouse_s, game_rect)) {
@@ -142,8 +178,8 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
     // (y_screen - cy) / -zoom = y_world - cam.y
     // y_world = cam.y - (y_screen - cy) / zoom
     
-    float wx = (mouse_s.x - cx) / zoom_level + cam->pos.x;
-    float wy = cam->pos.y - (mouse_s.y - cy) / zoom_level;
+    float wx = (mouse_s.x - cx) / zoom_level + view_pos.x;
+    float wy = view_pos.y - (mouse_s.y - cy) / zoom_level;
     
     // 2D Grid Limit Check
     // "Do not allow points to exceed this range in the editor."
