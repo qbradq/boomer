@@ -453,9 +453,9 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
         
         Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
         
-        DrawRectangleLinesEx(rect, 1.0f, RED);
-        DrawLine(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height, RED); // Diagonal 1
-        DrawLine(rect.x, rect.y + rect.height, rect.x + rect.width, rect.y, RED); // Diagonal 2
+        DrawRectangleLinesEx(rect, 1.0f, MAGENTA);
+        DrawLine(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height, MAGENTA); // Diagonal 1
+        DrawLine(rect.x, rect.y + rect.height, rect.x + rect.width, rect.y, MAGENTA); // Diagonal 2
     }
     
     // 5. Draw Hovers
@@ -556,9 +556,9 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
             float ey = cy - (e->pos.y - view_pos.y) * zoom;
             float half_size = 16.0f * zoom;
             Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
-            DrawRectangleLinesEx(rect, 2.0f, MAGENTA); // Bright Purple approx
-            DrawLineEx((Vector2){rect.x, rect.y}, (Vector2){rect.x + rect.width, rect.y + rect.height}, 2.0f, MAGENTA);
-            DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, MAGENTA);
+            DrawRectangleLinesEx(rect, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
+            DrawLineEx((Vector2){rect.x, rect.y}, (Vector2){rect.x + rect.width, rect.y + rect.height}, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
+            DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
         }
     }
     // Else if point selected
@@ -627,7 +627,7 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
                  float y1 = cy - (p1.y - view_pos.y) * zoom;
                  float x2 = cx + (p2.x - view_pos.x) * zoom;
                  float y2 = cy - (p2.y - view_pos.y) * zoom;
-                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, LIME);
+                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
              }
         }
     }
