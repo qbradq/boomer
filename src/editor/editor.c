@@ -57,6 +57,7 @@ typedef struct {
 static bool is_dragging = false;
 static bool drag_valid = true;
 static DragState drag_state = {0};
+static struct Map* editor_map_ref = NULL;
 
 static void DragState_Free(void) {
     if (drag_state.original_points) {
@@ -189,6 +190,117 @@ static void Editor_StartDrag(struct Map* map, Vector2 mouse_world) {
     }
 }
 
+
+static float CCW(Vec2 p1, Vec2 p2, Vec2 p3) {
+    return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+}
+
+static bool DoSegmentsIntersect(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4) {
+    float d1 = CCW(p3, p4, p1);
+    float d2 = CCW(p3, p4, p2);
+    float d3 = CCW(p1, p2, p3);
+    float d4 = CCW(p1, p2, p4);
+
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+        ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+        return true;
+    }
+    
+    // Check for collinear overlaps if needed, but for now strict crossing is enough
+    // to prevent "walls from intersecting".
+    
+    return false;
+}
+
+static bool IsWallIntersectingAny(struct Map* map, int wall_idx) {
+    if (wall_idx < 0 || wall_idx >= (int)map->wall_count) return false;
+    
+    Wall* w1 = &map->walls[wall_idx];
+    Vec2 p1 = map->points[w1->p1];
+    Vec2 p2 = map->points[w1->p2];
+    
+    for (int i = 0; i < (int)map->wall_count; ++i) {
+        if (i == wall_idx) continue;
+        
+        Wall* w2 = &map->walls[i];
+        
+        // Ignore neighbors (share a vertex)
+        if (w1->p1 == w2->p1 || w1->p1 == w2->p2 || 
+            w1->p2 == w2->p1 || w1->p2 == w2->p2) {
+            continue;
+        }
+        
+        Vec2 p3 = map->points[w2->p1];
+        Vec2 p4 = map->points[w2->p2];
+        
+        if (DoSegmentsIntersect(p1, p2, p3, p4)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static int GetSectorOfWall(struct Map* map, int wall_idx) {
+    if (wall_idx < 0 || wall_idx >= (int)map->wall_count) return -1;
+    
+    // Linear search (since we don't store sector ID in wall)
+    for (int s = 0; s < (int)map->sector_count; ++s) {
+        Sector* sec = &map->sectors[s];
+        if (wall_idx >= sec->first_wall && wall_idx < (int)(sec->first_wall + sec->num_walls)) {
+            return s;
+        }
+    }
+    return -1;
+}
+
+static bool IsPointInSector(struct Map* map, Vec2 p, int sector_idx) {
+    Sector* s = &map->sectors[sector_idx];
+    bool inside = false;
+    
+    // Ray casting algorithm
+    for (u32 i = 0, j = s->num_walls - 1; i < s->num_walls; j = i++) {
+        Wall* w1 = &map->walls[s->first_wall + i];
+        Wall* w2 = &map->walls[s->first_wall + j];
+        Vec2 p1 = map->points[w1->p1];
+        Vec2 p2 = map->points[w2->p1]; // Use p1 of next wall (or this wall's p2 which should equal next wall's p1 in a loop)
+        // Wait, Build engine structure: Wall points are p1..p2.
+        // Assuming contiguous walls: w[i].p1 to w[i].p2.
+        // And w[i].p2 == w[i+1].p1 usually.
+        // Let's use w1->p1 and w1->p2 for the segment.
+        p2 = map->points[w1->p2];
+        
+        if (((p1.y > p.y) != (p2.y > p.y)) &&
+            (p.x < (p2.x - p1.x) * (p.y - p1.y) / (p2.y - p1.y) + p1.x)) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+static bool CheckSelfIntersection(struct Map* map, int sector_id) {
+    if (sector_id < 0 || sector_id >= (int)map->sector_count) return false;
+    Sector* s = &map->sectors[sector_id];
+
+    // Check if any map point (NOT part of this sector) is inside this sector
+    for (int i = 0; i < (int)map->point_count; ++i) {
+        // Skip points belonging to this sector
+        bool is_vertex = false;
+        for (u32 k = 0; k < s->num_walls; ++k) {
+            Wall* w = &map->walls[s->first_wall + k];
+            if ((int)w->p1 == i || (int)w->p2 == i) {
+                is_vertex = true;
+                break;
+            }
+        }
+        if (is_vertex) continue;
+
+        if (IsPointInSector(map, map->points[i], sector_id)) {
+            return true; // Invalid: Point i is inside sector
+        }
+    }
+    return false;
+}
+
 static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
     if (!is_dragging) return;
     
@@ -216,6 +328,39 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
         dest = SnapVecToGrid(dest, grid_size);
         
         map->points[sel_id] = dest;
+
+        // Validate: Check if any wall connected to this point intersects others
+        for (int i = 0; i < (int)map->wall_count; ++i) {
+            if (map->walls[i].p1 == sel_id || map->walls[i].p2 == sel_id) {
+                if (IsWallIntersectingAny(map, i)) {
+                    drag_valid = false;
+                    break;
+                }
+            }
+        }
+        
+        // Validate: Check for Point-In-Sector overlap (Self Intersection / Consuming points)
+        // Find sectors using this point
+        if (drag_valid) {
+            for (int s = 0; s < (int)map->sector_count; ++s) {
+                 Sector* sec = &map->sectors[s];
+                 bool uses_point = false;
+                 for (u32 i = 0; i < sec->num_walls; ++i) {
+                     Wall* w = &map->walls[sec->first_wall + i];
+                     if (w->p1 == sel_id || w->p2 == sel_id) {
+                         uses_point = true;
+                         break;
+                     }
+                 }
+                 if (uses_point) {
+                     if (CheckSelfIntersection(map, s)) {
+                         drag_valid = false;
+                         break;
+                     }
+                 }
+            }
+        }
+
     } else if (sel_type == SEL_WALL) {
         // Wall: Snap start point, maintain direction
         Wall* w = &map->walls[sel_id];
@@ -230,6 +375,65 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
         map->points[w->p1] = p1_snapped;
         map->points[w->p2] = (Vec2){ p2_start.x + move_delta.x, p2_start.y + move_delta.y };
         
+        // Validate: Check this wall and any connected walls
+        if (IsWallIntersectingAny(map, sel_id)) {
+            drag_valid = false;
+        } else {
+            // Check connected walls (that use p1 or p2)
+            for (int i = 0; i < (int)map->wall_count; ++i) {
+                if (i == sel_id) continue;
+                if (map->walls[i].p1 == w->p1 || map->walls[i].p2 == w->p1 ||
+                    map->walls[i].p1 == w->p2 || map->walls[i].p2 == w->p2) {
+                    if (IsWallIntersectingAny(map, i)) {
+                        drag_valid = false;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Validate: Point-In-Sector
+        if (drag_valid) {
+             int s_id = GetSectorOfWall(map, sel_id);
+             if (s_id != -1) {
+                 if (CheckSelfIntersection(map, s_id)) {
+                     drag_valid = false;
+                 }
+                 
+                 // Also check neighbor sector if portal?
+                 // Usually moving a wall affects both sectors if it's a portal.
+                 // Actually, a portal wall is shared. But `sel_id` refers to one wall entry.
+                 // If it's a portal, there is likely a corresponding wall in the other sector (if double-sided walls are used).
+                 // In Boomer/Build, portals link "next_sector". The geometry might be shared points.
+                 // If we move the points, we affect both.
+                 // We should find ALL sectors using these points and validate them.
+                 // For now, let's just check the primary sector. Ideally we'd scan all sectors.
+                 
+                 // Scan all sectors using these points just to be safe
+                 if (drag_valid) {
+                     for (int s = 0; s < (int)map->sector_count; ++s) {
+                        if (s == s_id) continue;
+                        Sector* sec = &map->sectors[s];
+                        bool affected = false;
+                         for (u32 i = 0; i < sec->num_walls; ++i) {
+                             Wall* neighbor_w = &map->walls[sec->first_wall + i];
+                             if (neighbor_w->p1 == w->p1 || neighbor_w->p2 == w->p1 ||
+                                 neighbor_w->p1 == w->p2 || neighbor_w->p2 == w->p2) {
+                                 affected = true;
+                                 break;
+                             }
+                         }
+                         if (affected) {
+                             if (CheckSelfIntersection(map, s)) {
+                                 drag_valid = false;
+                                 break;
+                             }
+                         }
+                     }
+                 }
+             }
+        }
+        
     } else if (sel_type == SEL_SECTOR) {
         // Sector: Snap first point, relative move others
         Sector* s = &map->sectors[sel_id];
@@ -243,6 +447,35 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
         for (u32 i = 0; i < s->num_walls; ++i) {
             Wall* w = &map->walls[s->first_wall + i];
             map->points[w->p1] = (Vec2){ drag_state.original_points[i].x + move_delta.x, drag_state.original_points[i].y + move_delta.y };
+        }
+
+        // Validate: Check all walls in this sector
+        for (u32 i = 0; i < s->num_walls; ++i) {
+             if (IsWallIntersectingAny(map, s->first_wall + i)) {
+                 drag_valid = false;
+                 break;
+             }
+        }
+        
+        // Validate: Point-In-Sector (Collision with outside points)
+        if (drag_valid) {
+            if (CheckSelfIntersection(map, sel_id)) {
+                drag_valid = false;
+            }
+            
+            // Also need to check if we moved *into* another sector?
+            // Moving a whole sector -> We are just translating it.
+            // Only need to check if its new points land inside another sector?
+            // Or if another sector's points land inside it?
+            // CheckSelfIntersection covers "Other points inside current sector".
+            // We should also check "Current sector points inside other sectors"?
+            // Or simple intersection check covers boundaries.
+            
+            // If boundaries don't cross, providing we didn't teleport inside, we are good.
+            // But we should check if we "swept" over something? Drag is discrete here.
+            
+            // The user prompt specifically asked "moves are also invalid if the move would result in any point residing inside the moved / changed sector."
+            // So CheckSelfIntersection covers exactly that.
         }
     }
 }
@@ -287,6 +520,8 @@ static void Editor_EndDrag(struct Map* map) {
 }
 
 void Editor_Update(struct Map* map, struct GameCamera* cam) {
+    editor_map_ref = map;
+
     // 0. Update Limits
     if (zoom_level < 1.0f/32.0f) zoom_level = 1.0f/32.0f;
     if (zoom_level > 32.0f) zoom_level = 32.0f;
@@ -696,7 +931,24 @@ int Editor_GetHoveredSectorID(void) {
 }
 
 int Editor_GetSelectedSectorID(void) {
-    return (sel_type == SEL_SECTOR) ? sel_id : -1;
+    if (sel_type == SEL_SECTOR) return sel_id;
+    
+    // If dragging and invalid, return associated sector to highlight it in RED
+    if (is_dragging && !drag_valid && editor_map_ref) {
+        if (sel_type == SEL_WALL) {
+            return GetSectorOfWall(editor_map_ref, sel_id);
+        } else if (sel_type == SEL_POINT) {
+            // Find any sector using this point
+            for (int s = 0; s < (int)editor_map_ref->sector_count; ++s) {
+                Sector* sec = &editor_map_ref->sectors[s];
+                for (u32 i = 0; i < sec->num_walls; ++i) {
+                    Wall* w = &editor_map_ref->walls[sec->first_wall + i];
+                    if (w->p1 == sel_id || w->p2 == sel_id) return s;
+                }
+            }
+        }
+    }
+    return -1;
 }
 
 int Editor_GetSelectedWallIndex(void) {
