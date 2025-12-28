@@ -229,7 +229,8 @@ void Loop(void) {
                 Editor_GetSelectedSectorID(), Editor_GetSelectedWallIndex(), 
                 Editor_GetHoveredSectorID(), Editor_GetHoveredWallIndex(),
                 Editor_GetSelectedEntityID(), Editor_GetHoveredEntityID(),
-                Editor_GetHoveredPointIndex(), Editor_GetSelectedPointIndex()); 
+                Editor_GetHoveredPointIndex(), Editor_GetSelectedPointIndex(),
+                Editor_IsDragInvalid()); 
  
         }
         Editor_Render(&map, &cam);

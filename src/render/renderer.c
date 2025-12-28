@@ -372,7 +372,7 @@ void Render_Frame(GameCamera cam, Map* map) {
     RenderSector(map, cam, start_sector, 0, VIDEO_WIDTH, y_top, y_bot, 0);
 }
 
-void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id, int hovered_point_index, int selected_point_index) {
+void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, int h, float zoom, int grid_size, int highlight_sector, int highlight_wall_index, int hovered_sector, int hovered_wall_index, int selected_entity_id, int hovered_entity_id, int hovered_point_index, int selected_point_index, bool is_move_invalid) {
     // Set viewport/clip
     BeginScissorMode(x, y, w, h);
     
@@ -381,6 +381,9 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
     
     float cx = x + w / 2.0f;
     float cy = y + h / 2.0f;
+    
+    // Selection Color
+    Color sel_col = is_move_invalid ? RED : (Color){0, 255, 255, 255};
     
     // 2. Draw Grid
     // Use passed grid_size, adjusted by zoom
@@ -556,26 +559,26 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
             float ey = cy - (e->pos.y - view_pos.y) * zoom;
             float half_size = 16.0f * zoom;
             Rectangle rect = { ex - half_size, ey - half_size, half_size * 2, half_size * 2 };
-            DrawRectangleLinesEx(rect, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
-            DrawLineEx((Vector2){rect.x, rect.y}, (Vector2){rect.x + rect.width, rect.y + rect.height}, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
-            DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
+            DrawRectangleLinesEx(rect, 2.0f, sel_col);
+            DrawLineEx((Vector2){rect.x, rect.y}, (Vector2){rect.x + rect.width, rect.y + rect.height}, 2.0f, sel_col);
+            DrawLineEx((Vector2){rect.x, rect.y + rect.height}, (Vector2){rect.x + rect.width, rect.y}, 2.0f, sel_col);
         }
     }
     // Else if point selected
     else if (selected_point_index != -1) {
-        // Draw selected point in bright cyan
+        // Draw selected point
         if (selected_point_index < map->point_count) {
             Vec2 pt = map->points[selected_point_index];
             float px = cx + (pt.x - view_pos.x) * zoom;
             float py = cy - (pt.y - view_pos.y) * zoom;
-            // Draw point as a square in bright cyan (11x11)
-            DrawRectangle(px - 5, py - 5, 11, 11, (Color){0, 255, 255, 255}); // Cyan
+            // Draw point as a square (11x11)
+            DrawRectangle(px - 5, py - 5, 11, 11, sel_col);
         }
     }
     // Else if wall selected (only draw if no selected point)
     else if (highlight_wall_index != -1) {
-        // Draw sector dark green, wait, how do we know the sector?
-        // Again, find sector.
+        // Draw sector dark green or something? No, keep logic.
+        // Actually, just draw wall selection.
          int sec_id = -1;
          for(int s=0; s<map->sector_count; ++s) {
              Sector* sec = &map->sectors[s];
@@ -588,6 +591,12 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
          if (sec_id != -1) {
              Sector* sec = &map->sectors[sec_id];
              Color lime_green = (Color){0, 255, 0, 255}; // Lime Green
+             // If invalid move, maybe tint sector red too?
+             // Prompt says: "The item being moved (selected item) should have a red overlay."
+             // If we select a wall, we often highlight the SECTOR too.
+             // But the invalid move is about the geometry.
+             // Let's keep lime green for context, and RED for the moved wall.
+             
              for (u32 k=0; k<sec->num_walls; ++k) {
                  Wall* w = &map->walls[sec->first_wall + k];
                  Vec2 p1 = map->points[w->p1];
@@ -600,7 +609,7 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
              }
          }
          
-         // Draw Selected Wall in Bright Cyan
+         // Draw Selected Wall
          if (highlight_wall_index < map->wall_count) {
              Wall* w = &map->walls[highlight_wall_index];
              Vec2 p1 = map->points[w->p1];
@@ -609,13 +618,10 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
              float y1 = cy - (p1.y - view_pos.y) * zoom;
              float x2 = cx + (p2.x - view_pos.x) * zoom;
              float y2 = cy - (p2.y - view_pos.y) * zoom;
-             DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, (Color){0, 255, 255, 255}); // Cyan
+             DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, sel_col);
          }
     }
-    // Else if sector selected (highlight_sector is used for selection in current signature?)
-    // Wait, the signature I have is: `highlight_sector`, `highlight_wall_index`...
-    // The previous code mapped `highlight_sector` to `Editor_GetSelectedSectorID`.
-    // So `highlight_sector` IS the selected sector.
+    // Else if sector selected
     else if (highlight_sector != -1) {
          if (highlight_sector < map->sector_count) {
              Sector* sec = &map->sectors[highlight_sector];
@@ -627,7 +633,7 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
                  float y1 = cy - (p1.y - view_pos.y) * zoom;
                  float x2 = cx + (p2.x - view_pos.x) * zoom;
                  float y2 = cy - (p2.y - view_pos.y) * zoom;
-                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, (Color){0, 255, 255, 255}); // Bright Cyan
+                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, sel_col);
              }
         }
     }

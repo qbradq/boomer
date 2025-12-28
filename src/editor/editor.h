@@ -46,7 +46,11 @@ int Editor_GetViewMode(void);
 
 // Get Current Zoom Level
 float Editor_GetZoom(void);
+
 int Editor_GetGridSize(void);
+
+// Drag Status
+bool Editor_IsDragInvalid(void);
 Vec2 Editor_GetViewPos(void);
 
 

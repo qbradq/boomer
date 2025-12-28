@@ -1,5 +1,7 @@
 ---
-alwaysApply: true
+trigger: always_on
+glob:
+description:
 ---
 
 # CMake Build Workflow for C23 Projects
@@ -21,3 +23,4 @@ alwaysApply: true
 
 - Allow: `cmake`, `ninja`, `ctest`, `make`, `clang-tidy-20`, `cppcheck`.
 - Ask before: Installing dependencies or modifying presets.
+

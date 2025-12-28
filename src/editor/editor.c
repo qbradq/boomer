@@ -5,6 +5,8 @@
 #include <math.h>
 #include "../world/world_types.h"
 #include "../game/entity.h"
+#include <stdlib.h>
+#include <string.h>
 #include "../render/renderer.h"
 
 #define TOOLBAR_HEIGHT 40
@@ -39,6 +41,30 @@ static int hovered_sector = -1;
 static int hovered_wall = -1;
 static int hovered_entity = -1;
 static int hovered_point = -1;
+
+// Drag State
+typedef struct {
+    Vec2 mouse_start;
+    
+    // Stored geometry state
+    Vec2* original_points; // For Sector (all points), Wall (2 points), Point (1 point)
+    int num_stored_points;
+    
+    // Stored entity state
+    Vec3 original_entity_pos;
+} DragState;
+
+static bool is_dragging = false;
+static bool drag_valid = true;
+static DragState drag_state = {0};
+
+static void DragState_Free(void) {
+    if (drag_state.original_points) {
+        free(drag_state.original_points);
+        drag_state.original_points = NULL;
+    }
+    drag_state.num_stored_points = 0;
+}
 
 // View State
 static Vec2 view_pos = {0};
@@ -100,9 +126,165 @@ static float DistToLine(Vector2 p, Vector2 l1, Vector2 l2) {
     return sqrtf((p.x - proj.x)*(p.x - proj.x) + (p.y - proj.y)*(p.y - proj.y));
 }
 
+static float SnapToGrid(float val, int grid) {
+    return roundf(val / (float)grid) * (float)grid;
+}
+
+static Vec2 SnapVecToGrid(Vec2 v, int grid) {
+    return (Vec2){ SnapToGrid(v.x, grid), SnapToGrid(v.y, grid) };
+}
+
 // Check point in sector logic (simplified raycast or using GetSectorAt if reliable)
 // Using GetSectorAt from world logic is best, but let's re-verify it works for a given Point.
 // Assuming GetSectorAt works in world space.
+
+// --- Drag Logic ---
+
+static void Editor_StartDrag(struct Map* map, Vector2 mouse_world) {
+    if (sel_type == SEL_NONE || sel_id == -1) return;
+    
+    is_dragging = true;
+    drag_valid = true;
+    drag_state.mouse_start = (Vec2){mouse_world.x, mouse_world.y};
+    drag_state.original_points = NULL;
+    drag_state.num_stored_points = 0;
+    
+    if (sel_type == SEL_ENTITY) {
+        Entity* e = Entity_Get(sel_id);
+        if (e) {
+            drag_state.original_entity_pos = e->pos;
+        } else {
+            is_dragging = false;
+        }
+    } else if (sel_type == SEL_POINT) {
+        if (sel_id < (int)map->point_count) {
+            drag_state.num_stored_points = 1;
+            drag_state.original_points = malloc(sizeof(Vec2));
+            drag_state.original_points[0] = map->points[sel_id];
+        } else {
+            is_dragging = false;
+        }
+    } else if (sel_type == SEL_WALL) {
+        if (sel_id < (int)map->wall_count) {
+            drag_state.num_stored_points = 2;
+            drag_state.original_points = malloc(sizeof(Vec2) * 2);
+            Wall* w = &map->walls[sel_id];
+            drag_state.original_points[0] = map->points[w->p1];
+            drag_state.original_points[1] = map->points[w->p2];
+        } else {
+            is_dragging = false;
+        }
+    } else if (sel_type == SEL_SECTOR) {
+        if (sel_id < (int)map->sector_count) {
+            Sector* s = &map->sectors[sel_id];
+            drag_state.num_stored_points = s->num_walls;
+            drag_state.original_points = malloc(sizeof(Vec2) * s->num_walls);
+            for (u32 i = 0; i < s->num_walls; ++i) {
+                Wall* w = &map->walls[s->first_wall + i];
+                drag_state.original_points[i] = map->points[w->p1];
+            }
+        } else {
+            is_dragging = false;
+        }
+    }
+}
+
+static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
+    if (!is_dragging) return;
+    
+    Vector2 delta = { mouse_world.x - drag_state.mouse_start.x, mouse_world.y - drag_state.mouse_start.y };
+    drag_valid = true; // Assume valid until proven otherwise
+    
+    if (sel_type == SEL_ENTITY) {
+        Entity* e = Entity_Get(sel_id);
+        if (e) {
+            // Snap to grid
+            Vec2 dest_2d = (Vec2){ drag_state.original_entity_pos.x + delta.x, drag_state.original_entity_pos.y + delta.y };
+            dest_2d = SnapVecToGrid(dest_2d, grid_size);
+            
+            e->pos.x = dest_2d.x;
+            e->pos.y = dest_2d.y;
+            
+            // Validate: Must be in a sector
+            if (GetSectorAt(map, dest_2d) == -1) {
+                drag_valid = false;
+            }
+        }
+    } else if (sel_type == SEL_POINT) {
+        // Point: Snap point to grid
+        Vec2 dest = (Vec2){ drag_state.original_points[0].x + delta.x, drag_state.original_points[0].y + delta.y };
+        dest = SnapVecToGrid(dest, grid_size);
+        
+        map->points[sel_id] = dest;
+    } else if (sel_type == SEL_WALL) {
+        // Wall: Snap start point, maintain direction
+        Wall* w = &map->walls[sel_id];
+        Vec2 p1_start = drag_state.original_points[0];
+        Vec2 p2_start = drag_state.original_points[1];
+        
+        Vec2 p1_target = (Vec2){ p1_start.x + delta.x, p1_start.y + delta.y };
+        Vec2 p1_snapped = SnapVecToGrid(p1_target, grid_size);
+        
+        Vec2 move_delta = (Vec2){ p1_snapped.x - p1_start.x, p1_snapped.y - p1_start.y };
+        
+        map->points[w->p1] = p1_snapped;
+        map->points[w->p2] = (Vec2){ p2_start.x + move_delta.x, p2_start.y + move_delta.y };
+        
+    } else if (sel_type == SEL_SECTOR) {
+        // Sector: Snap first point, relative move others
+        Sector* s = &map->sectors[sel_id];
+        Vec2 p0_start = drag_state.original_points[0];
+        
+        Vec2 p0_target = (Vec2){ p0_start.x + delta.x, p0_start.y + delta.y };
+        Vec2 p0_snapped = SnapVecToGrid(p0_target, grid_size);
+        
+        Vec2 move_delta = (Vec2){ p0_snapped.x - p0_start.x, p0_snapped.y - p0_start.y };
+        
+        for (u32 i = 0; i < s->num_walls; ++i) {
+            Wall* w = &map->walls[s->first_wall + i];
+            map->points[w->p1] = (Vec2){ drag_state.original_points[i].x + move_delta.x, drag_state.original_points[i].y + move_delta.y };
+        }
+    }
+}
+
+static void Editor_CancelDrag(struct Map* map) {
+    if (!is_dragging) return;
+    
+    // Restore
+    if (sel_type == SEL_ENTITY) {
+        Entity* e = Entity_Get(sel_id);
+        if (e) e->pos = drag_state.original_entity_pos;
+    } else if (sel_type == SEL_POINT) {
+        map->points[sel_id] = drag_state.original_points[0];
+    } else if (sel_type == SEL_WALL) {
+        Wall* w = &map->walls[sel_id];
+        map->points[w->p1] = drag_state.original_points[0];
+        map->points[w->p2] = drag_state.original_points[1];
+    } else if (sel_type == SEL_SECTOR) {
+        Sector* s = &map->sectors[sel_id];
+        for (u32 i = 0; i < s->num_walls; ++i) {
+            Wall* w = &map->walls[s->first_wall + i];
+            map->points[w->p1] = drag_state.original_points[i];
+        }
+    }
+    
+    is_dragging = false;
+    DragState_Free();
+}
+
+static void Editor_EndDrag(struct Map* map) {
+    if (!is_dragging) return;
+    
+    if (!drag_valid) {
+        Editor_CancelDrag(map);
+        return;
+    }
+    
+    // Apply is already done implicitly by UpdateDrag modifying the map directly.
+    // Just cleanup.
+    is_dragging = false;
+    DragState_Free();
+}
 
 void Editor_Update(struct Map* map, struct GameCamera* cam) {
     // 0. Update Limits
@@ -113,7 +295,6 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
     if (grid_size > 1024) grid_size = 1024;
 
     if (!is_active) return;
-    // if (editor_has_focus) return; // UI has focus - handled implicitly by raygui
     
     // World Mouse Pos
     Rectangle game_rect = GetGameViewRect();
@@ -133,11 +314,19 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         else zoom_level /= 2.0f;
     }
 
-    // Panning with Right Mouse Button
+    // Panning with Right Mouse Button or Drag Cancel
     if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
-        Vector2 delta = GetMouseDelta();
-        view_pos.x -= delta.x / zoom_level;
-        view_pos.y += delta.y / zoom_level;
+        if (is_dragging) {
+             Editor_CancelDrag(map);
+        } else {
+            Vector2 delta = GetMouseDelta();
+            view_pos.x -= delta.x / zoom_level;
+            view_pos.y += delta.y / zoom_level;
+        }
+    }
+    
+    if (IsKeyPressed(KEY_ESCAPE) && is_dragging) {
+        Editor_CancelDrag(map);
     }
 
     // Teleport with Middle Mouse Button
@@ -161,8 +350,8 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
          }
     }
     
-    // If outside view, ignore
-    if (!CheckCollisionPointRec(mouse_s, game_rect)) {
+    // If outside view, ignore, UNLESS dragging
+    if (!CheckCollisionPointRec(mouse_s, game_rect) && !is_dragging) {
         hovered_entity = -1;
         hovered_wall = -1;
         hovered_sector = -1;
@@ -176,18 +365,18 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
     float cx = game_rect.x + game_rect.width / 2.0f;
     float cy = game_rect.y + game_rect.height / 2.0f;
     
-    // In Render_Map2D, we did:
-    // y_screen = cy - (y_world - cam.y) * zoom
-    // (y_screen - cy) / -zoom = y_world - cam.y
-    // y_world = cam.y - (y_screen - cy) / zoom
-    
     float wx = (mouse_s.x - cx) / zoom_level + view_pos.x;
     float wy = view_pos.y - (mouse_s.y - cy) / zoom_level;
     
-    // 2D Grid Limit Check
-    // "Do not allow points to exceed this range in the editor."
-    // -32768 to 32768.
-    // We are not moving points yet, but if we were, we'd clamp wx/wy here.
+    // Drag Update
+    if (is_dragging) {
+        Editor_UpdateDrag(map, (Vector2){wx, wy});
+        
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            Editor_EndDrag(map);
+        }
+        return; // Skip hover logic while dragging
+    }
     
     // Hover Logic
     hovered_entity = -1;
@@ -281,40 +470,6 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         int sec = GetSectorAt(map, (Vec2){wx, wy});
         if (sec != -1) {
             hovered_sector = sec;
-        } else {
-            // OR within 10px of a non-portal wall of this sector.
-            // This implies we check walls again??
-            // "The cursor is hovering over a sector if: The cursor location is within the bounds ... OR the cursor location is within 10px of a non-portal wall of this sector."
-            // Checking dist to ALL non-portal walls:
-            // If we are close to a solid wall, we hover the wall (priority 2).
-            // But if we are close to a solid wall, we ALSO hover the sector?
-            // "Else, if we are hovering a wall, make the wall the current selection."
-            // So Wall > Sector.
-            // But the definition of Sector Hover includes being close to a wall.
-            // However, since we check Wall FIRST, and if found we set hovered_wall, 
-            // the Sector Logic (which is priority 3, "if hovered_entity == -1 && hovered_wall == -1") won't be reached if we are close to a wall.
-            // Wait. "The cursor is hovering over a sector if... Or within 10px of a non-portal wall".
-            // If I am within 10px of a non-portal wall, I am hovering the WALL (Priority 2).
-            // So I wouldn't reach Priority 3 logic.
-            // UNLESS "hovering a wall" check failed?
-            // "The cursor is hovering over a wall if ... within 10px"
-            // So if I am within 10px, I AM hovering a wall.
-            // So the second condition for sector hover is redundant if Wall Hover takes precedence?
-            // "Else, if we are hovering a wall, make the wall the current selection." -> This is CLICK logic.
-            // Hover logic (tracking) is "Track which sector the cursor is hovering over".
-            // PROMPT: "Track which wall... Track which sector..."
-            // It implies we can hover multiple things simultaneously?
-            // "On click: If we are hovering an entity... Else if wall... Else if sector..."
-            // This establishes hierarchy for SELECTION.
-            // But for RENDERING Highlight:
-            // "If there is a hovered entity: Draw entity... Else if hovered wall: Draw... Else if hovered sector..."
-            // So Hierarchy exists in Rendering too.
-            // So effectively, if we hover a wall, we effectively don't "need" to know if we hover the sector separately for rendering, 
-            // EXCEPT "Draw the sector of that wall in orange". This uses the wall's sector.
-            // But what if we hover a solid wall from the OUTSIDE? (Void).
-            // Walls are one-sided? PROMPT says "Draw the normal... pointing inward".
-            // Usually editors handle walls as belonging to the sector on the inside.
-            // So yes, checking GetSectorAt is mostly sufficient.
         }
     }
     
@@ -335,6 +490,11 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         } else {
             sel_type = SEL_NONE;
             sel_id = -1;
+        }
+        
+        // Attempt Start Drag
+        if (sel_type != SEL_NONE && current_tool == TOOL_SELECT) {
+             Editor_StartDrag(map, (Vector2){wx, wy});
         }
     }
 }
@@ -563,6 +723,11 @@ float Editor_GetZoom(void) {
     return zoom_level;
 }
 
+
 int Editor_GetGridSize(void) {
     return grid_size;
+}
+
+bool Editor_IsDragInvalid(void) {
+    return is_dragging && !drag_valid;
 }

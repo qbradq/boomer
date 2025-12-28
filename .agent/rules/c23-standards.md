@@ -1,7 +1,8 @@
 ---
-alwaysApply: true
+trigger: always_on
+glob:
+description:
 ---
-
 # C23 Language Standards
 
 ## Required Practices
@@ -23,3 +24,5 @@ alwaysApply: true
 
 - No C11 `restrict` - use C23 `[[restrict]]` if needed.
 - Avoid `typeof` - use `typeof_unequal` from `<stdtype.h>`.
+
+
