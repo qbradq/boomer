@@ -552,6 +552,22 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
     }
     
     // 6. Draw Selections
+    if (highlight_sector != -1) {
+         if (highlight_sector < map->sector_count) {
+             Sector* sec = &map->sectors[highlight_sector];
+             for (u32 k=0; k<sec->num_walls; ++k) {
+                 Wall* w = &map->walls[sec->first_wall + k];
+                 Vec2 p1 = map->points[w->p1];
+                 Vec2 p2 = map->points[w->p2];
+                 float x1 = cx + (p1.x - view_pos.x) * zoom;
+                 float y1 = cy - (p1.y - view_pos.y) * zoom;
+                 float x2 = cx + (p2.x - view_pos.x) * zoom;
+                 float y2 = cy - (p2.y - view_pos.y) * zoom;
+                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, sel_col);
+             }
+        }
+    }
+
     if (selected_entity_id != -1) {
         Entity* e = Entity_Get(selected_entity_id);
         if (e) {
@@ -588,7 +604,7 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
              }
          }
          
-         if (sec_id != -1) {
+         if (sec_id != -1 && highlight_sector == -1) {
              Sector* sec = &map->sectors[sec_id];
              Color lime_green = (Color){0, 255, 0, 255}; // Lime Green
              // If invalid move, maybe tint sector red too?
@@ -620,22 +636,6 @@ void Render_Map2D(Map* map, GameCamera cam, Vec2 view_pos, int x, int y, int w, 
              float y2 = cy - (p2.y - view_pos.y) * zoom;
              DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, sel_col);
          }
-    }
-    // Else if sector selected
-    else if (highlight_sector != -1) {
-         if (highlight_sector < map->sector_count) {
-             Sector* sec = &map->sectors[highlight_sector];
-             for (u32 k=0; k<sec->num_walls; ++k) {
-                 Wall* w = &map->walls[sec->first_wall + k];
-                 Vec2 p1 = map->points[w->p1];
-                 Vec2 p2 = map->points[w->p2];
-                 float x1 = cx + (p1.x - view_pos.x) * zoom;
-                 float y1 = cy - (p1.y - view_pos.y) * zoom;
-                 float x2 = cx + (p2.x - view_pos.x) * zoom;
-                 float y2 = cy - (p2.y - view_pos.y) * zoom;
-                 DrawLineEx((Vector2){x1, y1}, (Vector2){x2, y2}, 2.0f, sel_col);
-             }
-        }
     }
     
     // 7. If there is a hovered wall and NO hovered entity and NO hovered point, draw the hovered wall in yellow

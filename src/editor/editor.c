@@ -306,6 +306,34 @@ static bool CheckSelfIntersection(struct Map* map, int sector_id) {
     return false;
 }
 
+// Check if a point is inside any sector, excluding sectors that use this point as a vertex
+static bool IsPointInAnyOtherSector(struct Map* map, int point_idx, Vec2 pos) {
+    for (int s = 0; s < (int)map->sector_count; ++s) {
+        Sector* sec = &map->sectors[s];
+        
+        // Check if this sector uses this point
+        bool uses_point = false;
+        for (u32 k = 0; k < sec->num_walls; ++k) {
+             Wall* w = &map->walls[sec->first_wall + k];
+             // If point_idx is -1 (arbitrary point), we don't skip based on connectivity. 
+             // But if we are validating a Map Point index, skip its own sectors.
+             if (point_idx != -1) {
+                 if ((int)w->p1 == point_idx || (int)w->p2 == point_idx) {
+                     uses_point = true;
+                     break;
+                 }
+             }
+        }
+        
+        if (uses_point) continue;
+        
+        if (IsPointInSector(map, pos, s)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
     if (!is_dragging) return;
     
@@ -344,7 +372,7 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
             }
         }
         
-        // Validate: Check for Point-In-Sector overlap (Self Intersection / Consuming points)
+        // Validate: Point-In-Sector overlap (Self Intersection / Consuming points)
         // Find sectors using this point
         if (drag_valid) {
             for (int s = 0; s < (int)map->sector_count; ++s) {
@@ -364,6 +392,13 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
                      }
                  }
             }
+            
+            // 2. Point inside OTHER sectors
+            if (drag_valid) {
+                 if (IsPointInAnyOtherSector(map, sel_id, dest)) {
+                     drag_valid = false;
+                 }
+            }
         }
 
     } else if (sel_type == SEL_WALL) {
@@ -377,8 +412,11 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
         
         Vec2 move_delta = (Vec2){ p1_snapped.x - p1_start.x, p1_snapped.y - p1_start.y };
         
-        map->points[w->p1] = p1_snapped;
-        map->points[w->p2] = (Vec2){ p2_start.x + move_delta.x, p2_start.y + move_delta.y };
+        Vec2 dest_p1 = p1_snapped;
+        Vec2 dest_p2 = (Vec2){ p2_start.x + move_delta.x, p2_start.y + move_delta.y };
+        
+        map->points[w->p1] = dest_p1;
+        map->points[w->p2] = dest_p2;
         
         // Validate: Check this wall and any connected walls
         if (IsWallIntersectingAny(map, sel_id)) {
@@ -436,6 +474,14 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
                          }
                      }
                  }
+                 
+                 // Validate: Check if moved points are inside OTHER sectors
+                 if (drag_valid) {
+                     if (IsPointInAnyOtherSector(map, w->p1, dest_p1) || 
+                         IsPointInAnyOtherSector(map, w->p2, dest_p2)) {
+                         drag_valid = false;
+                     }
+                 }
              }
         }
         
@@ -481,6 +527,17 @@ static void Editor_UpdateDrag(struct Map* map, Vector2 mouse_world) {
             
             // The user prompt specifically asked "moves are also invalid if the move would result in any point residing inside the moved / changed sector."
             // So CheckSelfIntersection covers exactly that.
+            
+             // Validate: Check if ANY moved point is inside ANY OTHER sector
+             if (drag_valid) {
+                 for (u32 i = 0; i < s->num_walls; ++i) {
+                     Wall* w = &map->walls[s->first_wall + i];
+                     if (IsPointInAnyOtherSector(map, w->p1, map->points[w->p1])) {
+                         drag_valid = false;
+                         break;
+                     }
+                 }
+             }
         }
     }
 }
