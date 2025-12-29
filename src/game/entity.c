@@ -1,6 +1,7 @@
 #include "entity.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define MAX_ENTITIES 1024
 
@@ -184,6 +185,8 @@ u32 Entity_Spawn(const char* script_path, Vec3 pos) {
     e->pos = pos;
     e->vel = (Vec3){0,0,0};
     e->yaw = 0;
+    strncpy(e->script_path, script_path, 63);
+    e->script_path[63] = '\0';
     
     // Set 'id' in Instance
     JS_SetPropertyStr(ctx, instance, "id", JS_NewInt32(ctx, e->id));
@@ -228,4 +231,126 @@ void Entity_Update(f32 dt) {
         e->pos.y += e->vel.y * dt;
         e->pos.z += e->vel.z * dt;
     }
+}
+
+// --- Snapshot Implementation ---
+
+int Entity_GetSnapshot(EntitySnapshot** out_snapshots) {
+    int count = 0;
+    for (int i=0; i<MAX_ENTITIES; ++i) {
+        if (g_entities[i].active) count++;
+    }
+    
+    if (count == 0) {
+        *out_snapshots = NULL;
+        return 0;
+    }
+    
+    *out_snapshots = (EntitySnapshot*)malloc(sizeof(EntitySnapshot) * count);
+    int idx = 0;
+    for (int i=0; i<MAX_ENTITIES; ++i) {
+        if (g_entities[i].active) {
+            EntitySnapshot* sn = &(*out_snapshots)[idx++];
+            sn->id = g_entities[i].id;
+            sn->pos = g_entities[i].pos;
+            sn->yaw = g_entities[i].yaw;
+            strncpy(sn->script_path, g_entities[i].script_path, 63);
+            sn->script_path[63] = '\0';
+        }
+    }
+    return count;
+}
+
+static void Entity_Destroy(int slot) {
+    if (slot < 0 || slot >= MAX_ENTITIES) return;
+    Entity* e = &g_entities[slot];
+    if (!e->active) return;
+    
+    JSContext* ctx = Script_GetContext();
+    if (ctx) {
+        JS_FreeValue(ctx, e->instance_js);
+    }
+    
+    e->active = false;
+    e->id = 0;
+}
+
+void Entity_Restore(const EntitySnapshot* snapshots, int count) {
+    // 1. Mark all current active entities as "to be deleted" (or check against snapshots)
+    bool kept[MAX_ENTITIES];
+    memset(kept, 0, sizeof(kept));
+    
+    // We will iterate snapshots and match with current entities
+    for (int i=0; i<count; ++i) {
+        const EntitySnapshot* sn = &snapshots[i];
+        
+        // Find existing
+        int slot = -1;
+        for (int k=0; k<MAX_ENTITIES; ++k) {
+            if (g_entities[k].active && g_entities[k].id == sn->id) {
+                slot = k;
+                break;
+            }
+        }
+        
+        if (slot != -1) {
+            // Update Existing
+            Entity* e = &g_entities[slot];
+            e->pos = sn->pos;
+            e->yaw = sn->yaw;
+            // Check script path (Re-spawn if different?)
+            if (strncmp(e->script_path, sn->script_path, 64) != 0) {
+                 // Path changed (unlikely for same ID, but handle it)
+                 // For now, simpler to destroy and re-spawn
+                 Entity_Destroy(slot);
+                 slot = -1; // Fallthrough to spawn
+            } else {
+                 kept[slot] = true;
+            }
+        }
+        
+        if (slot == -1) {
+            // Spawn New (Force ID)
+            // Use Entity_Spawn then override ID?
+            // Entity_Spawn finds free slot.
+            int new_id = Entity_Spawn(sn->script_path, sn->pos);
+            if (new_id != 0) {
+                 // Find the slot we just spawned into
+                 Entity* e = Entity_Get(new_id);
+                 if (e) {
+                     e->id = sn->id; // FORCE ID to match snapshot
+                     e->yaw = sn->yaw;
+                     
+                     // We need to update the JS object's 'id' property too if we forced it?
+                     // Entity_Spawn sets it. If we change it, we should update JS.
+                     JSContext* ctx = Script_GetContext();
+                     if (ctx && !JS_IsException(e->instance_js)) {
+                          JS_SetPropertyStr(ctx, e->instance_js, "id", JS_NewInt32(ctx, e->id));
+                     }
+                     
+                     // Find index for 'kept' array
+                     for(int k=0; k<MAX_ENTITIES; ++k) {
+                         if (&g_entities[k] == e) {
+                             kept[k] = true;
+                             break;
+                         }
+                     }
+                 }
+            }
+        }
+    }
+    
+    // 2. Delete any that were not in snapshot
+    for (int i=0; i<MAX_ENTITIES; ++i) {
+        if (g_entities[i].active && !kept[i]) {
+            Entity_Destroy(i);
+        }
+    }
+    
+    // Update next_id to be max(id) + 1 to prevent collision
+    u32 max_id = 0;
+    for (int i=0; i<MAX_ENTITIES; ++i) {
+        if (g_entities[i].active && g_entities[i].id > max_id) max_id = g_entities[i].id;
+    }
+    g_next_id = max_id + 1;
 }

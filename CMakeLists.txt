@@ -55,6 +55,7 @@ add_executable(boomer
   src/core/config.c
   src/game/entity.c
   src/editor/editor.c
+  src/editor/undo_sys.c
   src/ui/console.c
   src/ui/gui_impl.c
 )

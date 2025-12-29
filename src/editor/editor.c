@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../render/renderer.h"
+#include "undo_sys.h"
 
 #define TOOLBAR_HEIGHT 40
 #define STATUSBAR_HEIGHT 24
@@ -91,6 +92,7 @@ Rectangle GetGameViewRect(void) {
 
 void Editor_Init(void) {
     GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
+    Undo_Init();
 }
 
 void Editor_InputBegin(void) {
@@ -143,6 +145,9 @@ static Vec2 SnapVecToGrid(Vec2 v, int grid) {
 
 static void Editor_StartDrag(struct Map* map, Vector2 mouse_world) {
     if (sel_type == SEL_NONE || sel_id == -1) return;
+    
+    // Undo: Push state BEFORE modifying anything
+    Undo_PushState(map);
     
     is_dragging = true;
     drag_valid = true;
@@ -564,6 +569,34 @@ void Editor_Update(struct Map* map, struct GameCamera* cam) {
         Editor_CancelDrag(map);
     }
 
+    if (IsKeyPressed(KEY_ESCAPE) && is_dragging) {
+        Editor_CancelDrag(map);
+    }
+    
+    // Undo / Redo
+    if (IsKeyDown(KEY_LEFT_CONTROL)) {
+        if (IsKeyPressed(KEY_Z)) {
+            // If dragging, cancel first
+            if (is_dragging) Editor_CancelDrag(map);
+            Undo_PerformUndo(map);
+        } else if (IsKeyPressed(KEY_Y)) {
+             if (is_dragging) Editor_CancelDrag(map);
+             Undo_PerformRedo(map);
+        }
+    }
+    
+    // Delete
+    if (IsKeyPressed(KEY_DELETE)) {
+        if (sel_type == SEL_ENTITY && sel_id != -1) {
+            Undo_PushState(map);
+            // Delete Entity
+            Entity* e = Entity_Get(sel_id);
+            if (e) e->active = false;
+            sel_id = -1;
+            sel_type = SEL_NONE;
+        }
+    }
+
     // Teleport with Middle Mouse Button
     if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
          Vector2 mouse_pos = GetMousePosition();
@@ -751,8 +784,17 @@ static void DrawToolbar(void) {
     x += pad * 2; // Separator
     
     // Edit
-    if (GuiButton((Rectangle){x, y, w, h}, "#004#")) printf("Stub: Undo\n"); x += w + pad;
-    if (GuiButton((Rectangle){x, y, w, h}, "#005#")) printf("Stub: Redo\n"); x += w + pad;
+    if (GuiButton((Rectangle){x, y, w, h}, "Undo")) {
+        if (is_dragging) Editor_CancelDrag(editor_map_ref);
+        Undo_PerformUndo(editor_map_ref);
+    } 
+    x += w + pad;
+    
+    if (GuiButton((Rectangle){x, y, w, h}, "Redo")) {
+        if (is_dragging) Editor_CancelDrag(editor_map_ref);
+        Undo_PerformRedo(editor_map_ref);
+    } 
+    x += w + pad;
     if (GuiButton((Rectangle){x, y, w, h}, "#016#")) printf("Stub: Copy\n"); x += w + pad;
     if (GuiButton((Rectangle){x, y, w, h}, "#017#")) printf("Stub: Cut\n"); x += w + pad;
     if (GuiButton((Rectangle){x, y, w, h}, "#018#")) printf("Stub: Paste\n"); x += w + pad;
